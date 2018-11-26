@@ -31,6 +31,7 @@ str_MAX_CANNY = 'Canny max'
 
 _MAX_RGB = 255
 _VIDEO_WIDTH = 640
+_HUNDRED = 100
 
 class RoadSeeker:
 
@@ -62,13 +63,13 @@ class RoadSeeker:
         cv2.namedWindow(str_SETTINGS_W)
 
         # create settings trackbars
-        cv2.createTrackbar(str_ASPHALT_HUE_THRESHOLD_SPREAD, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.createTrackbar(str_ASPHALT_HUE_THRESHOLD_SPREAD, str_SETTINGS_W, 1, _HUNDRED, self.control_moved)
         cv2.setTrackbarPos(str_ASPHALT_HUE_THRESHOLD_SPREAD, str_SETTINGS_W, self.asphalt_hue_spread)
 
-        cv2.createTrackbar(str_ASPHALT_SAT_THRESHOLD_SPREAD, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.createTrackbar(str_ASPHALT_SAT_THRESHOLD_SPREAD, str_SETTINGS_W, 1, _HUNDRED, self.control_moved)
         cv2.setTrackbarPos(str_ASPHALT_SAT_THRESHOLD_SPREAD, str_SETTINGS_W, self.asphalt_sat_spread)
 
-        cv2.createTrackbar(str_ASPHALT_LIG_THRESHOLD_SPREAD, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.createTrackbar(str_ASPHALT_LIG_THRESHOLD_SPREAD, str_SETTINGS_W, 1, _HUNDRED, self.control_moved)
         cv2.setTrackbarPos(str_ASPHALT_LIG_THRESHOLD_SPREAD, str_SETTINGS_W, self.asphalt_lig_spread)
 
         cv2.createTrackbar(str_ERODE_KERNEL, str_SETTINGS_W, 1, 30, self.control_moved)
@@ -98,7 +99,7 @@ class RoadSeeker:
         cv2.createTrackbar('R min', str_SETTINGS_W, 1, 255, self.control_moved)
         cv2.setTrackbarPos('R min', str_SETTINGS_W, self.min_red)
 
-        cv2.createTrackbar(str_ASPHALT_COLORS, str_SETTINGS_W, 1, 20, self.control_moved)
+        cv2.createTrackbar(str_ASPHALT_COLORS, str_SETTINGS_W, 1, 50, self.control_moved)
         cv2.setTrackbarPos(str_ASPHALT_COLORS, str_SETTINGS_W, self.n_road_colors)
 
     def control_moved(self, _):
@@ -217,9 +218,53 @@ class RoadSeeker:
 
         return cv2.resize(undersampled, (_width, _height))
 
+    def calcAsphaltColorBoundaries(self, _input):
+        _hist_shrink_ratio = 5
+        (_height, _width, _) = _input.shape
+
+        self.readAsphaltBox(_input)
+
+        undersampled = imutils.resize(self.readAsphaltBox(_input), (int(_width / _hist_shrink_ratio)))
+
+        hist0 = cv2.calcHist([undersampled],  # images
+                             [0],             # channels
+                             None,            # mask
+                             [_MAX_RGB],      # histSize
+                             [0, _MAX_RGB])   # ranges
+
+        hist1 = cv2.calcHist([undersampled],  # images
+                             [1],             # channels
+                             None,            # mask
+                             [_MAX_RGB],      # histSize
+                             [0, _MAX_RGB])   # ranges
+
+        hist2 = cv2.calcHist([undersampled],  # images
+                             [2],             # channels
+                             None,            # mask
+                             [_MAX_RGB],      # histSize
+                             [0, _MAX_RGB])   # ranges
+
+        dcols0 = heapq.nlargest(self.n_road_colors, range(len(hist0)), hist0.take)
+        dcols1 = heapq.nlargest(self.n_road_colors, range(len(hist1)), hist1.take)
+        dcols2 = heapq.nlargest(self.n_road_colors, range(len(hist2)), hist2.take)
+
+        lower_color_bounds = [min(dcols0), min(dcols1), min(dcols2)]
+        upper_color_bounds = [max(dcols0), max(dcols1), max(dcols2)]
+
+        self.asphalt_colors = [lower_color_bounds, upper_color_bounds]
+        while len(self.asphalt_colors) < self.n_road_colors:
+            self.asphalt_colors.append((0,0,0))
+
+        return lower_color_bounds, upper_color_bounds
+
+
     def toHls(self, _input):
         hls = cv2.cvtColor(_input, cv2.COLOR_BGR2HLS)
         return hls
+
+    def toHsv(self, _input):
+        hsv = cv2.cvtColor(_input, cv2.COLOR_BGR2HSV)
+        return hsv
 
     def thresholdedByAnd(self, _input):
         self.readThresholdingParams()
@@ -268,14 +313,14 @@ class RoadSeeker:
     def thresholdedOnlyHue(self, _input):
         self.readThresholdingParams()
 
-        fullmask = cv2.inRange(_input, (_MAX_RGB,_MAX_RGB,_MAX_RGB), (0, 0,  0)) # full true map
+        fullmask = cv2.inRange(_input, (0, 0,  0), (_MAX_RGB,_MAX_RGB,_MAX_RGB)) # full true map
         for i in range(0, self.n_road_colors):
-            lower_color_bounds = np.array([self.asphalt_colors[i][0] - self.asphalt_hue_spread,
-                                           self.asphalt_colors[i][2] - self.asphalt_lig_spread,
-                                           self.asphalt_colors[i][1] - self.asphalt_sat_spread])
-            upper_color_bounds = np.array([self.asphalt_colors[i][0] + self.asphalt_hue_spread,
-                                           self.asphalt_colors[i][2] + self.asphalt_lig_spread,
-                                           self.asphalt_colors[i][1] + self.asphalt_sat_spread])
+            lower_color_bounds = np.array([self.asphalt_colors[i][0] * ( 1 - self.asphalt_hue_spread),
+                                           self.asphalt_colors[i][2] * ( 1 - self.asphalt_lig_spread),
+                                           self.asphalt_colors[i][1] * ( 1 - self.asphalt_sat_spread)])
+            upper_color_bounds = np.array([self.asphalt_colors[i][0] * ( 1 + self.asphalt_hue_spread),
+                                           self.asphalt_colors[i][2] * ( 1 + self.asphalt_lig_spread),
+                                           self.asphalt_colors[i][1] * ( 1 + self.asphalt_sat_spread)])
 
             mask = cv2.inRange(_input, lower_color_bounds, upper_color_bounds)
 
@@ -284,9 +329,86 @@ class RoadSeeker:
             if self.dilate_size > 0:
                 mask = cv2.dilate(mask, self.dilate_kernel)
 
-            fullmask = cv2.bitwise_or(fullmask, mask)
+            fullmask = cv2.bitwise_and(fullmask, mask)
         # cv2.imshow('Fullmask', fullmask)
         mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
+        frame = _input & mask_rgb
+
+        return frame
+
+    def thresholdedGray(self, _input):
+        self.readThresholdingParams()
+
+        fullmask = cv2.inRange(_input, (_MAX_RGB,_MAX_RGB,_MAX_RGB), (0, 0,  0) ) # full true map
+        for i in range(0, self.n_road_colors):
+            lower_color_bounds = np.array([self.asphalt_colors[i][0] * ( 1 - self.asphalt_hue_spread),
+                                           self.asphalt_colors[i][2] * ( 1 - self.asphalt_lig_spread),
+                                           self.asphalt_colors[i][1] * ( 1 - self.asphalt_sat_spread)])
+            upper_color_bounds = np.array([self.asphalt_colors[i][0] * ( 1 + self.asphalt_hue_spread),
+                                           self.asphalt_colors[i][2] * ( 1 + self.asphalt_lig_spread),
+                                           self.asphalt_colors[i][1] * ( 1 + self.asphalt_sat_spread)])
+
+            mask = cv2.inRange(_input, lower_color_bounds, upper_color_bounds)
+            if self.erode_size > 0:
+                mask = cv2.erode(mask, self.erode_kernel)
+            if self.dilate_size > 0:
+                mask = cv2.dilate(mask, self.dilate_kernel)
+
+            fullmask = cv2.addWeighted(fullmask, 0.1 * (1 + i), mask, 0.1, 0.0)
+        cv2.imshow('Fullmask', fullmask)
+        mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
+        frame = _input & mask_rgb
+
+        return frame
+
+    def thresholdedBy3Hist(self, _input):
+        self.readThresholdingParams()
+        (_height, _width, _) = _input.shape
+        resample_ratio = 5
+        resamle = cv2.resize(_input, (int(_width/resample_ratio), int(_height/resample_ratio)))
+
+        lo, hi = self.calcAsphaltColorBoundaries(_input)
+        lo, hi = np.array(lo), np.array(hi)
+
+        lo -= self.asphalt_hue_spread
+        hi += self.asphalt_hue_spread
+
+        fullmask = cv2.inRange(resamle, lo, hi ) # full true map
+        if self.erode_size > 0:
+            fullmask = cv2.erode(fullmask, self.erode_kernel)
+        if self.dilate_size > 0:
+            fullmask = cv2.dilate(fullmask, self.dilate_kernel)
+        cv2.imshow('Fullmask', fullmask)
+        mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
+        mask_rgb = cv2.resize(mask_rgb, (_width, _height))
+        frame = _input & mask_rgb
+
+        return frame
+
+    def thresholdedAfterUndersample(self, _input):
+        self.readThresholdingParams()
+        (_height, _width, _) = _input.shape
+        _undersampling_ratio = 5
+        unders = cv2.resize(_input, (int(_width / _undersampling_ratio), int(_height / _undersampling_ratio)))
+        fullmask = cv2.inRange(unders, (_MAX_RGB,_MAX_RGB,_MAX_RGB), (0, 0,  0) ) # full true map
+        for i in range(0, self.n_road_colors):
+            lower_color_bounds = np.array([self.asphalt_colors[i][0] * ( 1 - self.asphalt_hue_spread),
+                                           self.asphalt_colors[i][2] * ( 1 - self.asphalt_lig_spread),
+                                           self.asphalt_colors[i][1] * ( 1 - self.asphalt_sat_spread)])
+            upper_color_bounds = np.array([self.asphalt_colors[i][0] * ( 1 + self.asphalt_hue_spread),
+                                           self.asphalt_colors[i][2] * ( 1 + self.asphalt_lig_spread),
+                                           self.asphalt_colors[i][1] * ( 1 + self.asphalt_sat_spread)])
+
+            mask = cv2.inRange(unders, lower_color_bounds, upper_color_bounds)
+            if self.erode_size > 0:
+                mask = cv2.erode(mask, self.erode_kernel)
+            if self.dilate_size > 0:
+                mask = cv2.dilate(mask, self.dilate_kernel)
+
+            fullmask = cv2.bitwise_or(fullmask, mask)
+        cv2.imshow('Fullmask', fullmask)
+        mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
+        mask_rgb = cv2.resize(mask_rgb, (_width, _height))
         frame = _input & mask_rgb
 
         return frame
@@ -410,5 +532,5 @@ def process_video(input=0, mirror=False):
             break  # esc to quit
     cv2.destroyAllWindows()
 
-process_video('video/road6.mp4')
+#process_video('video/road6.mp4')
 # process_video()

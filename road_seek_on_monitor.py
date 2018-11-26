@@ -3,7 +3,7 @@ from webcam import *
 from PIL import Image
 import mss as MSS
 
-monitor = {"top": 500, "left": 500, "width": 500, "height": 500}
+monitor = {"top": 20, "left": 64, "width": 800, "height": 600}
 output = "sct-{top}x{left}_{width}x{height}.png".format(**monitor)
 
 
@@ -15,25 +15,41 @@ def process_image():
 
         img = Image.frombytes('RGB', (sct_img.width, sct_img.height), sct_img.rgb)
 
-        img = np.array(img)
+        raw = np.array(img)
 
-        #hsl = processor.toHls(img)
-        #cv2.imshow('HSV', hsl)
+        hls = processor.toHls(raw)
+        # cv2.imshow('HSV', hsl)
 
-        asphalt = processor.takeAsphaltRegion(img)
-        #cv2.imshow('Asphalt', asphalt)
+        # asphalt = processor.calcAsphaltColorsHistHLS(hls)
+        # cv2.imshow('Asphalt HSL', asphalt)
 
-        thresholdedAnd = processor.thresholdedByAnd(img)
-        cv2.imshow('And Threshold', thresholdedAnd)
+        # thresholdedAnd = processor.thresholdedByAnd(hsl)
+        # cv2.imshow('And Threshold HSL', thresholdedAnd)
 
-        #thresholdedOnlyHue = processor.thresholdedOnlyHue(img)
-        #cv2.imshow('Hue Threshold', thresholdedOnlyHue)
+        thresholdedOr = processor.thresholdedBy3Hist(hls)
+        # cv2.imshow('Or Threshold HSL', thresholdedOr)
 
-        cutted = processor.plotInfo(img)
-        #edges = processor. edges(thresholdedAnd)
+        # thresholdedOnlyHue = processor.thresholdedOnlyHue(hsl)
+        # cv2.imshow('Hue Threshold HSL', thresholdedOnlyHue)
 
-        #cv2.imshow('Edges', processor.edges(edges))
-        cv2.imshow('Cutted', cutted)
+        cutted = processor.plotInfo(hls)
+        cv2.imshow('Processed HSL', np.concatenate((cutted, thresholdedOr), axis=1))
+
+        # asphalt = processor.calcAsphaltColorsKmean(raw)
+        # # cv2.imshow('Asphalt', asphalt)
+        #
+        # # thresholdedAnd = processor.thresholdedByAnd(img)
+        # # cv2.imshow('And Threshold', thresholdedAnd)
+        #
+        # thresholdedOr = processor.thresholdedByOr(raw)
+        # # cv2.imshow('Or Threshold', thresholdedOr)
+        #
+        # # thresholdedOnlyHue = processor.thresholdedOnlyHue(img)
+        # # cv2.imshow('Hue Threshold', thresholdedOnlyHue)
+        #
+        # cutted = processor.plotInfo(raw)
+        # # cv2.imshow('Cutted', cutted)
+        # cv2.imshow('Processed RGB', np.concatenate((cutted, thresholdedOr), axis=1))
 
         if cv2.waitKey(10) == 27:
             cv2.destroyAllWindows()
