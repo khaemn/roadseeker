@@ -4,6 +4,7 @@ from collections import namedtuple
 import typing
 import numpy as np
 import edge
+import heapq
 
 Point = typing.NamedTuple("Point", [('x', int), ('y', int)])
 
@@ -183,7 +184,7 @@ class RoadSeeker:
 
         return cv2.resize(undersampled, (_width, _height))
 
-    def calcAsphaltColorsHistHSV(self, _input):
+    def calcAsphaltColorsHistHLS(self, _input):
         _hist_shrink_ratio = 1
         (_height, _width, _) = _input.shape
 
@@ -191,16 +192,25 @@ class RoadSeeker:
 
         undersampled = imutils.resize(self.readAsphaltBox(_input), (int(_width / _hist_shrink_ratio)))
 
+        hist = cv2.calcHist([undersampled],  # images
+                            [0],             # channels
+                            None,            # mask
+                            [_MAX_RGB],      # histSize
+                            [0, _MAX_RGB])   # ranges
 
+        dcols = heapq.nlargest(self.n_road_colors, range(len(hist)), hist.take)
 
+        dominating_color_hue = hist.argmax()
 
+        # numpy approach to histing s nor the best
+        mean_color = undersampled.mean(axis=0).mean(axis=0)
 
         self.asphalt_colors.clear()
         while len(self.asphalt_colors) < self.n_road_colors:
             self.asphalt_colors.append((0, 0, 0))
 
-        for i in range(0, min(self.n_road_colors, len(palette))):
-            dominant = palette[i]
+        for i in range(0, self.n_road_colors):
+            dominant = [dcols[i], mean_color[1], mean_color[2]]
             self.asphalt_colors[i] = (int(dominant[0]),
                                       int(dominant[1]),
                                       int(dominant[2]))
@@ -261,11 +271,11 @@ class RoadSeeker:
         fullmask = cv2.inRange(_input, (_MAX_RGB,_MAX_RGB,_MAX_RGB), (0, 0,  0)) # full true map
         for i in range(0, self.n_road_colors):
             lower_color_bounds = np.array([self.asphalt_colors[i][0] - self.asphalt_hue_spread,
-                                           self.asphalt_colors[i][1] - self.asphalt_sat_spread,
-                                           self.asphalt_colors[i][2] - self.asphalt_lig_spread])
+                                           self.asphalt_colors[i][2] - self.asphalt_lig_spread,
+                                           self.asphalt_colors[i][1] - self.asphalt_sat_spread])
             upper_color_bounds = np.array([self.asphalt_colors[i][0] + self.asphalt_hue_spread,
-                                           self.asphalt_colors[i][1] + self.asphalt_sat_spread,
-                                           self.asphalt_colors[i][2] + self.asphalt_lig_spread])
+                                           self.asphalt_colors[i][2] + self.asphalt_lig_spread,
+                                           self.asphalt_colors[i][1] + self.asphalt_sat_spread])
 
             mask = cv2.inRange(_input, lower_color_bounds, upper_color_bounds)
 
@@ -352,36 +362,53 @@ def process_video(input=0, mirror=False):
         raw = imutils.resize(raw, _VIDEO_WIDTH)
 
 
-        hsl = processor.toHls(raw)
-        cv2.imshow('HSV', hsl)
+        # hsl = processor.toHls(raw)
+        # cv2.imshow('HSV', hsl)
+        #
+        # asphalt = processor.calcAsphaltColorsKmean(hsl)
+        # # cv2.imshow('Asphalt', asphalt)
+        #
+        # # further processing for below-horizon part only to increase performance
+        # # significant = processor.significant(hsv)
+        #
+        # thresholdedAnd = processor.thresholdedByAnd(hsl)
+        # cv2.imshow('And Threshold', thresholdedAnd)
+        #
+        # # thresholdedOr = processor.thresholdedByOr(hsl)
+        # # cv2.imshow('Or Threshold', thresholdedOr)
+        #
+        # thresholdedOnlyHue = processor.thresholdedOnlyHue(hsl)
+        # cv2.imshow('Hue Threshold', thresholdedOnlyHue)
+        #
+        # cutted = processor.plotInfo(raw)
+        # edges = processor.edges(thresholdedAnd)
+        #
+        # #cv2.imshow('Edges', processor.edges(edges))
+        # cv2.imshow('Cutted', cutted)
+        #
+        # # cv2.imshow('Lane', processor.driving_lane(raw))
 
-        asphalt = processor.calcAsphaltColorsKmean(hsl)
-        # cv2.imshow('Asphalt', asphalt)
+        hls = processor.toHls(raw)
 
-        # further processing for below-horizon part only to increase performance
-        # significant = processor.significant(hsv)
+        asphalt = processor.calcAsphaltColorsHistHLS(hls)
 
-        thresholdedAnd = processor.thresholdedByAnd(hsl)
-        cv2.imshow('And Threshold', thresholdedAnd)
+        thresholdedOr = processor.thresholdedOnlyHue(hls)
 
-        # thresholdedOr = processor.thresholdedByOr(hsl)
-        # cv2.imshow('Or Threshold', thresholdedOr)
+        cutted = processor.plotInfo(hls)
+        cv2.imshow('Processed HSL', np.concatenate((cutted, thresholdedOr), axis=1))
 
-        thresholdedOnlyHue = processor.thresholdedOnlyHue(hsl)
-        cv2.imshow('Hue Threshold', thresholdedOnlyHue)
+        #asphalt = processor.calcAsphaltColorsKmean(raw)
 
-        cutted = processor.plotInfo(raw)
-        edges = processor.edges(thresholdedAnd)
+        #thresholdedOr = processor.thresholdedByOr(raw)
 
-        #cv2.imshow('Edges', processor.edges(edges))
-        cv2.imshow('Cutted', cutted)
+        #cutted = processor.plotInfo(raw)
+        #cv2.imshow('Processed RGB', np.concatenate((cutted, thresholdedOr), axis=1))
 
-        # cv2.imshow('Lane', processor.driving_lane(raw))
-
+        cv2.imshow('Lane', processor.driving_lane(raw))
 
         if cv2.waitKey(1) == 27:
             break  # esc to quit
     cv2.destroyAllWindows()
 
-#process_video('road3.mp4')
+process_video('video/road6.mp4')
 # process_video()
