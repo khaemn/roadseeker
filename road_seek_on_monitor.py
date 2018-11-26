@@ -1,4 +1,4 @@
-from webcam import *
+from roadseeker import *
 
 from PIL import Image
 import mss as MSS
