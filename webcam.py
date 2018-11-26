@@ -11,13 +11,25 @@ Point = typing.NamedTuple("Point", [('x', int), ('y', int)])
 SearchArea = namedtuple('SearchArea', 'left, top, width, height')
 
 
-_SETTINGS_W = 'Settings'
-_ASPHALT_LEFT = 'Box left'
-_MIN_LIGHTNESS = 'Lightness min'
-_MIN_RED = 'Lightness min'
-_ERODE_KERNEL = 'Erode kernel'
-_DILATE_KERNEL = 'Dilate kernel'
+str_SETTINGS_W = 'Settings'
 
+str_ASPHALT_LEFT = 'Asphalt box left'
+str_ASPHALT_TOP = 'Asphalt box top'
+str_ASPHALT_WIDTH = 'Asphalt box width'
+str_ASPHALT_COLORS = 'N asphalt colors'
+
+str_MIN_LIGHTNESS = 'Lightness min'
+str_MIN_RED = 'Lightness min'
+str_ERODE_KERNEL = 'Erode kernel'
+str_DILATE_KERNEL = 'Dilate kernel'
+str_ASPHALT_HUE_THRESHOLD_SPREAD = 'Hue spread'
+str_ASPHALT_SAT_THRESHOLD_SPREAD = 'Sat spread'
+str_ASPHALT_LIG_THRESHOLD_SPREAD = 'Lig spread'
+str_MIN_CANNY = 'Canny min'
+str_MAX_CANNY = 'Canny max'
+
+_MAX_RGB = 255
+_VIDEO_WIDTH = 640
 
 class RoadSeeker:
     
@@ -28,53 +40,65 @@ class RoadSeeker:
     line_width = 2
     search_color = (0, 255, 0)
     asphalt_colors = [(0, 0, 0)]
-    asphalt_spread = 10  # in RGB units, defines the thresholding corridor
+
+    asphalt_hue_spread = 10  # in RGB units, defines the thresholding corridor
+    asphalt_sat_spread = 10  # in RGB units, defines the thresholding corridor
+
+
     min_lightness = 120
     min_red = 110
     canny_min = 100
     canny_max = 200
-    erode_kernel = 2
-    dilate_kernel = 2
+    erode_size = 2
+    dilate_size = 2
+    erode_kernel = 0
+    dilate_kernel = 0
 
     n_road_colors = 10  # top N most relevant colors in the asphalt rectangle will be taken into account
 
+
     def __init__(self):
-        cv2.namedWindow(_SETTINGS_W)
-        # create trackbars for color change
-        cv2.createTrackbar('Threshold spread', _SETTINGS_W, 1, 100, RoadSeeker.nothing)
-        cv2.setTrackbarPos('Threshold spread', _SETTINGS_W, self.asphalt_spread)
+        cv2.namedWindow(str_SETTINGS_W)
 
-        cv2.createTrackbar('Erode kernel', _SETTINGS_W, 1, 30, RoadSeeker.nothing)
-        cv2.setTrackbarPos('Erode kernel', _SETTINGS_W, self.erode_kernel)
+        # create settings trackbars
+        cv2.createTrackbar(str_ASPHALT_HUE_THRESHOLD_SPREAD, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.setTrackbarPos(str_ASPHALT_HUE_THRESHOLD_SPREAD, str_SETTINGS_W, self.asphalt_hue_spread)
 
-        cv2.createTrackbar('Dilate kernel', _SETTINGS_W, 1, 30, RoadSeeker.nothing)
-        cv2.setTrackbarPos('Dilate kernel', _SETTINGS_W, self.dilate_kernel)
+        cv2.createTrackbar(str_ASPHALT_SAT_THRESHOLD_SPREAD, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.setTrackbarPos(str_ASPHALT_SAT_THRESHOLD_SPREAD, str_SETTINGS_W, self.asphalt_sat_spread)
 
-        cv2.createTrackbar('Canny min', _SETTINGS_W, 1, 200, RoadSeeker.nothing)
-        cv2.setTrackbarPos('Canny min', _SETTINGS_W, self.canny_min)
-        cv2.createTrackbar('Canny max', _SETTINGS_W, 1, 200, RoadSeeker.nothing)
-        cv2.setTrackbarPos('Canny max', _SETTINGS_W, self.canny_max)
+        cv2.createTrackbar(str_ERODE_KERNEL, str_SETTINGS_W, 1, 30, self.control_moved)
+        cv2.setTrackbarPos(str_ERODE_KERNEL, str_SETTINGS_W, self.erode_size)
 
-        cv2.createTrackbar('Box left', _SETTINGS_W, 1, 100, RoadSeeker.nothing)
-        cv2.setTrackbarPos('Box left', _SETTINGS_W, int(self.road_search_area.left * 100))
-        cv2.createTrackbar('Box top', _SETTINGS_W, 1, 100, RoadSeeker.nothing)
-        cv2.setTrackbarPos('Box top', _SETTINGS_W, int(self.road_search_area.top * 100))
+        cv2.createTrackbar(str_DILATE_KERNEL, str_SETTINGS_W, 1, 30, self.control_moved)
+        cv2.setTrackbarPos(str_DILATE_KERNEL, str_SETTINGS_W, self.dilate_size)
 
-        cv2.createTrackbar('Lightness min', _SETTINGS_W, 1, 255, RoadSeeker.nothing)
-        cv2.setTrackbarPos('Lightness min', _SETTINGS_W, self.min_lightness)
+        cv2.createTrackbar(str_MIN_CANNY, str_SETTINGS_W, 1, 200, self.control_moved)
+        cv2.setTrackbarPos(str_MIN_CANNY, str_SETTINGS_W, self.canny_min)
+        cv2.createTrackbar(str_MAX_CANNY, str_SETTINGS_W, 1, 200, self.control_moved)
+        cv2.setTrackbarPos(str_MAX_CANNY, str_SETTINGS_W, self.canny_max)
 
-        cv2.createTrackbar('Lightness min', _SETTINGS_W, 1, 255, RoadSeeker.nothing)
-        cv2.setTrackbarPos('Lightness min', _SETTINGS_W, self.min_lightness)
+        cv2.createTrackbar(str_ASPHALT_LEFT, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.setTrackbarPos(str_ASPHALT_LEFT, str_SETTINGS_W, int(self.road_search_area.left * 100))
+        cv2.createTrackbar(str_ASPHALT_TOP, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.setTrackbarPos(str_ASPHALT_TOP, str_SETTINGS_W, int(self.road_search_area.top * 100))
+        cv2.createTrackbar(str_ASPHALT_WIDTH, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.setTrackbarPos(str_ASPHALT_WIDTH, str_SETTINGS_W, int(self.road_search_area.width * 100))
 
-        cv2.createTrackbar('R min', _SETTINGS_W, 1, 255, RoadSeeker.nothing)
-        cv2.setTrackbarPos('R min', _SETTINGS_W, self.min_red)
+        cv2.createTrackbar(str_MIN_LIGHTNESS, str_SETTINGS_W, 1, 255, self.control_moved)
+        cv2.setTrackbarPos(str_MIN_LIGHTNESS, str_SETTINGS_W, self.min_lightness)
 
-        cv2.createTrackbar('Asphalt colors', _SETTINGS_W, 1, 20, RoadSeeker.nothing)
-        cv2.setTrackbarPos('Asphalt colors', _SETTINGS_W, self.n_road_colors)
+        cv2.createTrackbar(str_MIN_LIGHTNESS, str_SETTINGS_W, 1, 255, self.control_moved)
+        cv2.setTrackbarPos(str_MIN_LIGHTNESS, str_SETTINGS_W, self.min_lightness)
 
-    @staticmethod
-    def nothing(_):
-        pass
+        cv2.createTrackbar('R min', str_SETTINGS_W, 1, 255, self.control_moved)
+        cv2.setTrackbarPos('R min', str_SETTINGS_W, self.min_red)
+
+        cv2.createTrackbar(str_ASPHALT_COLORS, str_SETTINGS_W, 1, 20, self.control_moved)
+        cv2.setTrackbarPos(str_ASPHALT_COLORS, str_SETTINGS_W, self.n_road_colors)
+
+    def control_moved(self, _):
+        return
 
     @staticmethod  # takes w and h in pixels, area of float coeffs, returns top-left and bottom-right vertexes
     def rectangleVertexes(width, height, area):
@@ -85,28 +109,24 @@ class RoadSeeker:
         return top_left, bottom_right
 
 
-    def shrink(self, _input):
+    def plotInfo(self, _input):
         _width, _height = _input.shape[1], _input.shape[0]
-
-        #  cut the topmost
-        #  result = cv2.resize(_input, (400, 200))
-        processed = _input
 
         # Show road searching area
         p1, p2 = RoadSeeker.rectangleVertexes(_width, _height, self.road_search_area)
-        cv2.rectangle(processed,
+        cv2.rectangle(_input,
                       (int(p1.x), int(p1.y)),
                       (int(p2.x), int(p2.y)),
                       self.search_color,
                       self.line_width)
 
-        self.plotAsphaltColors(processed)
+        self.plotAsphaltColors(_input)
 
-        return processed
+        return _input
 
     def plotAsphaltColors(self, _input):
         _width, _height = _input.shape[1], _input.shape[0]
-        # draw insignificant area using top 3 colors in asphalt road
+        # draw insignificant area using top N colors in asphalt road
         rectangle_width = int(_width / self.n_road_colors)
         for i in range(0, len(self.asphalt_colors)):
             cv2.rectangle(_input,
@@ -116,20 +136,18 @@ class RoadSeeker:
                           -1)
 
     def takeAsphaltRegion(self, _input):
-        _k_mean_shrink_ratio = 2
+        _k_mean_shrink_ratio = 10
         _width, _height = _input.shape[1], _input.shape[0]
 
-        self.road_search_area = SearchArea(cv2.getTrackbarPos('Box left', _SETTINGS_W) / 100,
-                                           cv2.getTrackbarPos('Box top', _SETTINGS_W) / 100,
-                                           self.road_search_area.width,
+        self.road_search_area = SearchArea(cv2.getTrackbarPos(str_ASPHALT_LEFT, str_SETTINGS_W) / 100,
+                                           cv2.getTrackbarPos(str_ASPHALT_TOP, str_SETTINGS_W) / 100,
+                                           cv2.getTrackbarPos(str_ASPHALT_WIDTH, str_SETTINGS_W) / 100,
                                            self.road_search_area.height)
 
         p1, p2 = RoadSeeker.rectangleVertexes(_width, _height, self.road_search_area)
         asphalt = _input[p1.y:p2.y, p1.x:p2.x]
 
-        undersampled = cv2.resize(asphalt,
-                                  (int(_width / _k_mean_shrink_ratio),
-                                   int(_height / _k_mean_shrink_ratio)))
+        undersampled = imutils.resize(asphalt, (int(_width / _k_mean_shrink_ratio)))
         asphalt = cv2.resize(undersampled, (_width, _height))
 
         # Extracting top N relevant asphalt colors
@@ -139,8 +157,9 @@ class RoadSeeker:
         pixels = np.float32(undersampled.reshape(-1, 3))
         flags = cv2.KMEANS_RANDOM_CENTERS
 
-        self.n_road_colors = cv2.getTrackbarPos('Asphalt colors', _SETTINGS_W) + 1
+        self.n_road_colors = cv2.getTrackbarPos(str_ASPHALT_COLORS, str_SETTINGS_W) + 1
         _, labels, palette = cv2.kmeans(pixels, self.n_road_colors, None, criteria, 1, flags)
+
 
         self.asphalt_colors.clear()
         while len(self.asphalt_colors) < self.n_road_colors:
@@ -158,35 +177,89 @@ class RoadSeeker:
         hls = cv2.cvtColor(_input, cv2.COLOR_BGR2HLS)
         return hls
 
-    def thresholdedRoad(self, _input):
-        self.asphalt_spread = cv2.getTrackbarPos('Threshold spread', _SETTINGS_W) + 1
-        self.erode_kernel = cv2.getTrackbarPos('Erode kernel', _SETTINGS_W) + 1
-        self.dilate_kernel = cv2.getTrackbarPos('Dilate kernel', _SETTINGS_W) + 1
-        erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.erode_kernel, self.erode_kernel * 2))
-        dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.dilate_kernel, self.dilate_kernel * 2))
+    def thresholdedByAnd(self, _input):
+        self.readThresholdingParams()
 
-        fullmask = cv2.inRange(_input, (0,0,0), (255,255,255))
+        fullmask = cv2.inRange(_input, (0,0,0), (255,255,255))  # full true map
         for i in range (0, self.n_road_colors):
-            lower_color_bounds = np.array([bound * (self.asphalt_spread / 100) for bound in self.asphalt_colors[i]])
-            upper_color_bounds = np.array([bound / (self.asphalt_spread / 100) for bound in self.asphalt_colors[i]])
+            lower_color_bounds = np.array([bound - self.asphalt_hue_spread for bound in self.asphalt_colors[i]])
+            upper_color_bounds = np.array([bound + self.asphalt_hue_spread for bound in self.asphalt_colors[i]])
 
             mask = cv2.inRange(_input, lower_color_bounds, upper_color_bounds)
 
-            mask = cv2.erode(mask, erode_kernel)
-            mask = cv2.dilate(mask, dilate_kernel)
+            if self.erode_size > 0:
+                mask = cv2.erode(mask, self.erode_kernel)
+            if self.dilate_size > 0:
+                mask = cv2.dilate(mask, self.dilate_kernel)
 
             fullmask = mask if i == 0 else cv2.bitwise_and(fullmask, mask)
-            # res = cv2.bitwise_and(_input, _input, mask=mask)
-            # cv2.imshow('Mask ' + str(i), mask)
-        cv2.imshow('Fullmask ', fullmask)
+        cv2.imshow('Fullmask', fullmask)
         mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
         frame = _input & mask_rgb
 
         return frame
 
+    def thresholdedByOr(self, _input):
+        self.readThresholdingParams()
+
+        fullmask = cv2.inRange(_input, (255,255,255), (0,0,0)) # full false map
+        for i in range (0, self.n_road_colors):
+            lower_color_bounds = np.array([bound - self.asphalt_hue_spread for bound in self.asphalt_colors[i]])
+            upper_color_bounds = np.array([bound + self.asphalt_hue_spread for bound in self.asphalt_colors[i]])
+
+            mask = cv2.inRange(_input, lower_color_bounds, upper_color_bounds)
+
+            if self.erode_size > 0:
+                mask = cv2.erode(mask, self.erode_kernel)
+            if self.dilate_size > 0:
+                mask = cv2.dilate(mask, self.dilate_kernel)
+
+            fullmask = cv2.bitwise_or(fullmask, mask)
+        cv2.imshow('Fullmask', fullmask)
+        mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
+        frame = _input & mask_rgb
+
+        return frame
+
+    def thresholdedOnlyHue(self, _input):
+        self.readThresholdingParams()
+
+        fullmask = cv2.inRange(_input, (0,0,0), (_MAX_RGB,_MAX_RGB,_MAX_RGB)) # full true map
+        for i in range (0, self.n_road_colors):
+            lower_color_bounds = np.array([self.asphalt_colors[i][0] - self.asphalt_hue_spread,
+                                           self.asphalt_colors[i][1] - self.asphalt_sat_spread,
+                                           0])
+            upper_color_bounds = np.array([self.asphalt_colors[i][0] + self.asphalt_hue_spread,
+                                           self.asphalt_colors[i][1] + self.asphalt_sat_spread,
+                                           _MAX_RGB])
+
+            mask = cv2.inRange(_input, lower_color_bounds, upper_color_bounds)
+
+            if self.erode_size > 0:
+                mask = cv2.erode(mask, self.erode_kernel)
+            if self.dilate_size > 0:
+                mask = cv2.dilate(mask, self.dilate_kernel)
+
+            fullmask = cv2.bitwise_and(fullmask, mask)
+        cv2.imshow('Fullmask', fullmask)
+        mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
+        frame = _input & mask_rgb
+
+        return frame
+
+    def readThresholdingParams(self):
+        self.asphalt_hue_spread = cv2.getTrackbarPos(str_ASPHALT_HUE_THRESHOLD_SPREAD, str_SETTINGS_W) + 1
+        self.asphalt_sat_spread = cv2.getTrackbarPos(str_ASPHALT_SAT_THRESHOLD_SPREAD, str_SETTINGS_W) + 1
+        self.erode_size = cv2.getTrackbarPos(str_ERODE_KERNEL, str_SETTINGS_W)
+        self.dilate_size = cv2.getTrackbarPos(str_DILATE_KERNEL, str_SETTINGS_W)
+        if self.erode_size > 0:
+            self.erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.erode_size, self.erode_size * 2))
+        if self.dilate_size > 0:
+            self.dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.dilate_size, self.dilate_size * 2))
+
     def edges(self, _input):
-        self.canny_min = cv2.getTrackbarPos('Canny min', _SETTINGS_W)
-        self.canny_min = cv2.getTrackbarPos('Canny max', _SETTINGS_W)
+        self.canny_min = cv2.getTrackbarPos(str_MIN_CANNY, str_SETTINGS_W)
+        self.canny_min = cv2.getTrackbarPos(str_MAX_CANNY, str_SETTINGS_W)
         edges = cv2.Canny(_input, self.canny_min, self.canny_min)
         return edges
 
@@ -203,8 +276,8 @@ class RoadSeeker:
         # function that finds the road driving lane line
         # image : camera image where the line locations are to be located
         # return : a masked image of onlt the lane lines
-        self.min_lightness = cv2.getTrackbarPos('Lightness min', _SETTINGS_W)
-        self.min_red = cv2.getTrackbarPos('R min', _SETTINGS_W)
+        self.min_lightness = cv2.getTrackbarPos(str_MIN_LIGHTNESS, str_SETTINGS_W)
+        self.min_red = cv2.getTrackbarPos('R min', str_SETTINGS_W)
         # Convert to HSV color space and separate the V channel
         # hls for Sobel edge detection
         hls = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
@@ -224,6 +297,9 @@ class RoadSeeker:
         return cv2.bitwise_or(rs_binary, sxbinary.astype(np.uint8))
     
     def roi(self, _input):
+        #  TODO: impl!
+
+        return _input
         
 
 
@@ -236,35 +312,41 @@ def process_video(input=0, mirror=False):
         if not ret_val:
             print("No video frame captured: video at end or no video present.")
             quit()
-        raw = imutils.resize(raw, int(raw.shape[1]/2))
-        # if mirror:
-        #   img = cv2.flip(img, 1)
 
-        # cv2.imshow('Input', img)
+        # First of all to increase perfomance we work with small video
+        raw = imutils.resize(raw, _VIDEO_WIDTH)
 
-        #hsv = processor.toHls(raw)
-        #cv2.imshow('HSV', hsv)
 
-        asphalt = processor.takeAsphaltRegion(raw)
+        hsl = processor.toHls(raw)
+        cv2.imshow('HSV', hsl)
+
+        asphalt = processor.takeAsphaltRegion(hsl)
         # cv2.imshow('Asphalt', asphalt)
 
-        significant = processor.significant(raw)
+        # further processing for below-horizon part only to increase performance
+        # significant = processor.significant(hsv)
 
-        thresholded = processor.thresholdedRoad(significant)
-        cv2.imshow('Threshold', thresholded)
+        thresholdedAnd = processor.thresholdedByAnd(hsl)
+        cv2.imshow('And Threshold', thresholdedAnd)
 
-        cutted = processor.shrink(raw)
-        edges = processor.edges(thresholded)
+        # thresholdedOr = processor.thresholdedByOr(hsl)
+        # cv2.imshow('Or Threshold', thresholdedOr)
 
-        cv2.imshow('Edges', processor.edges(edges))
+        thresholdedOnlyHue = processor.thresholdedOnlyHue(hsl)
+        cv2.imshow('Hue Threshold', thresholdedOnlyHue)
+
+        cutted = processor.plotInfo(raw)
+        edges = processor.edges(thresholdedAnd)
+
+        #cv2.imshow('Edges', processor.edges(edges))
         cv2.imshow('Cutted', cutted)
 
-        cv2.imshow('Lane', processor.driving_lane(raw))
+        # cv2.imshow('Lane', processor.driving_lane(raw))
 
 
         if cv2.waitKey(1) == 27:
             break  # esc to quit
     cv2.destroyAllWindows()
 
-process_video('road2.mp4')
+#process_video('road3.mp4')
 # process_video()
