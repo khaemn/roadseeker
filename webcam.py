@@ -32,17 +32,17 @@ _MAX_RGB = 255
 _VIDEO_WIDTH = 640
 
 class RoadSeeker:
-    
-    top_cutting_ratio = 0.4  # defines the cut top rectangle of the frame
+
     road_search_area = SearchArea(.45, .85, .1, .1)
     insignificant_area = SearchArea(0., 0., 1., .4)
-    horizon = 0.45  # horizon line in respectance to frame heightm starting from top
+    horizon = 0.35  # horizon line in respectance to frame heightm starting from top
     line_width = 2
     search_color = (0, 255, 0)
     asphalt_colors = [(0, 0, 0)]
 
     asphalt_hue_spread = 10  # in RGB units, defines the thresholding corridor
     asphalt_sat_spread = 10  # in RGB units, defines the thresholding corridor
+    asphalt_lig_spread = 10  # in RGB units, defines the thresholding corridor
 
 
     min_lightness = 120
@@ -54,7 +54,7 @@ class RoadSeeker:
     erode_kernel = 0
     dilate_kernel = 0
 
-    n_road_colors = 10  # top N most relevant colors in the asphalt rectangle will be taken into account
+    n_road_colors = 3  # top N most relevant colors in the asphalt rectangle will be taken into account
 
 
     def __init__(self):
@@ -66,6 +66,9 @@ class RoadSeeker:
 
         cv2.createTrackbar(str_ASPHALT_SAT_THRESHOLD_SPREAD, str_SETTINGS_W, 1, 100, self.control_moved)
         cv2.setTrackbarPos(str_ASPHALT_SAT_THRESHOLD_SPREAD, str_SETTINGS_W, self.asphalt_sat_spread)
+
+        cv2.createTrackbar(str_ASPHALT_LIG_THRESHOLD_SPREAD, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.setTrackbarPos(str_ASPHALT_LIG_THRESHOLD_SPREAD, str_SETTINGS_W, self.asphalt_lig_spread)
 
         cv2.createTrackbar(str_ERODE_KERNEL, str_SETTINGS_W, 1, 30, self.control_moved)
         cv2.setTrackbarPos(str_ERODE_KERNEL, str_SETTINGS_W, self.erode_size)
@@ -124,8 +127,19 @@ class RoadSeeker:
 
         return _input
 
+    def readAsphaltBox(self, _input):
+        (_height, _width, _) = _input.shape
+        self.n_road_colors = cv2.getTrackbarPos(str_ASPHALT_COLORS, str_SETTINGS_W) + 1
+        self.road_search_area = SearchArea(cv2.getTrackbarPos(str_ASPHALT_LEFT, str_SETTINGS_W) / 100,
+                                           cv2.getTrackbarPos(str_ASPHALT_TOP, str_SETTINGS_W) / 100,
+                                           cv2.getTrackbarPos(str_ASPHALT_WIDTH, str_SETTINGS_W) / 100,
+                                           self.road_search_area.height)
+        p1, p2 = RoadSeeker.rectangleVertexes(_width, _height, self.road_search_area)
+        asphalt = _input[p1.y:p2.y, p1.x:p2.x]
+        return asphalt
+
     def plotAsphaltColors(self, _input):
-        _width, _height = _input.shape[1], _input.shape[0]
+        (_height, _width, _) = _input.shape
         # draw insignificant area using top N colors in asphalt road
         rectangle_width = int(_width / self.n_road_colors)
         for i in range(0, len(self.asphalt_colors)):
@@ -135,20 +149,13 @@ class RoadSeeker:
                           self.asphalt_colors[i],
                           -1)
 
-    def takeAsphaltRegion(self, _input):
+    def calcAsphaltColorsKmean(self, _input):
         _k_mean_shrink_ratio = 10
-        _width, _height = _input.shape[1], _input.shape[0]
+        (_height, _width, _) = _input.shape
 
-        self.road_search_area = SearchArea(cv2.getTrackbarPos(str_ASPHALT_LEFT, str_SETTINGS_W) / 100,
-                                           cv2.getTrackbarPos(str_ASPHALT_TOP, str_SETTINGS_W) / 100,
-                                           cv2.getTrackbarPos(str_ASPHALT_WIDTH, str_SETTINGS_W) / 100,
-                                           self.road_search_area.height)
+        self.readAsphaltBox(_input)
 
-        p1, p2 = RoadSeeker.rectangleVertexes(_width, _height, self.road_search_area)
-        asphalt = _input[p1.y:p2.y, p1.x:p2.x]
-
-        undersampled = imutils.resize(asphalt, (int(_width / _k_mean_shrink_ratio)))
-        asphalt = cv2.resize(undersampled, (_width, _height))
+        undersampled = imutils.resize(self.readAsphaltBox(_input), (int(_width / _k_mean_shrink_ratio)))
 
         # Extracting top N relevant asphalt colors
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
@@ -157,8 +164,35 @@ class RoadSeeker:
         pixels = np.float32(undersampled.reshape(-1, 3))
         flags = cv2.KMEANS_RANDOM_CENTERS
 
-        self.n_road_colors = cv2.getTrackbarPos(str_ASPHALT_COLORS, str_SETTINGS_W) + 1
         _, labels, palette = cv2.kmeans(pixels, self.n_road_colors, None, criteria, 1, flags)
+        _, counts = np.unique(labels, return_counts=True)
+
+        # Have tried to use no kmean, but average - works not very fine.
+        # palette = [_input.mean(axis=0).mean(axis=0)]
+        # print(palette[0])
+
+        self.asphalt_colors.clear()
+        while len(self.asphalt_colors) < self.n_road_colors:
+            self.asphalt_colors.append((0, 0, 0))
+
+        for i in range(0, min(self.n_road_colors, len(palette))):
+            dominant = palette[i]
+            self.asphalt_colors[i] = (int(dominant[0]),
+                                      int(dominant[1]),
+                                      int(dominant[2]))
+
+        return cv2.resize(undersampled, (_width, _height))
+
+    def calcAsphaltColorsHistHSV(self, _input):
+        _hist_shrink_ratio = 1
+        (_height, _width, _) = _input.shape
+
+        self.readAsphaltBox(_input)
+
+        undersampled = imutils.resize(self.readAsphaltBox(_input), (int(_width / _hist_shrink_ratio)))
+
+
+
 
 
         self.asphalt_colors.clear()
@@ -171,7 +205,7 @@ class RoadSeeker:
                                       int(dominant[1]),
                                       int(dominant[2]))
 
-        return asphalt
+        return cv2.resize(undersampled, (_width, _height))
 
     def toHls(self, _input):
         hls = cv2.cvtColor(_input, cv2.COLOR_BGR2HLS)
@@ -193,7 +227,7 @@ class RoadSeeker:
                 mask = cv2.dilate(mask, self.dilate_kernel)
 
             fullmask = mask if i == 0 else cv2.bitwise_and(fullmask, mask)
-        cv2.imshow('Fullmask', fullmask)
+        # cv2.imshow('Fullmask', fullmask)
         mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
         frame = _input & mask_rgb
 
@@ -215,7 +249,7 @@ class RoadSeeker:
                 mask = cv2.dilate(mask, self.dilate_kernel)
 
             fullmask = cv2.bitwise_or(fullmask, mask)
-        cv2.imshow('Fullmask', fullmask)
+        # cv2.imshow('Fullmask', fullmask)
         mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
         frame = _input & mask_rgb
 
@@ -224,14 +258,14 @@ class RoadSeeker:
     def thresholdedOnlyHue(self, _input):
         self.readThresholdingParams()
 
-        fullmask = cv2.inRange(_input, (0,0,0), (_MAX_RGB,_MAX_RGB,_MAX_RGB)) # full true map
-        for i in range (0, self.n_road_colors):
+        fullmask = cv2.inRange(_input, (_MAX_RGB,_MAX_RGB,_MAX_RGB), (0, 0,  0)) # full true map
+        for i in range(0, self.n_road_colors):
             lower_color_bounds = np.array([self.asphalt_colors[i][0] - self.asphalt_hue_spread,
                                            self.asphalt_colors[i][1] - self.asphalt_sat_spread,
-                                           0])
+                                           self.asphalt_colors[i][2] - self.asphalt_lig_spread])
             upper_color_bounds = np.array([self.asphalt_colors[i][0] + self.asphalt_hue_spread,
                                            self.asphalt_colors[i][1] + self.asphalt_sat_spread,
-                                           _MAX_RGB])
+                                           self.asphalt_colors[i][2] + self.asphalt_lig_spread])
 
             mask = cv2.inRange(_input, lower_color_bounds, upper_color_bounds)
 
@@ -240,8 +274,8 @@ class RoadSeeker:
             if self.dilate_size > 0:
                 mask = cv2.dilate(mask, self.dilate_kernel)
 
-            fullmask = cv2.bitwise_and(fullmask, mask)
-        cv2.imshow('Fullmask', fullmask)
+            fullmask = cv2.bitwise_or(fullmask, mask)
+        # cv2.imshow('Fullmask', fullmask)
         mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
         frame = _input & mask_rgb
 
@@ -250,6 +284,7 @@ class RoadSeeker:
     def readThresholdingParams(self):
         self.asphalt_hue_spread = cv2.getTrackbarPos(str_ASPHALT_HUE_THRESHOLD_SPREAD, str_SETTINGS_W) + 1
         self.asphalt_sat_spread = cv2.getTrackbarPos(str_ASPHALT_SAT_THRESHOLD_SPREAD, str_SETTINGS_W) + 1
+        self.asphalt_lig_spread = cv2.getTrackbarPos(str_ASPHALT_LIG_THRESHOLD_SPREAD, str_SETTINGS_W) + 1
         self.erode_size = cv2.getTrackbarPos(str_ERODE_KERNEL, str_SETTINGS_W)
         self.dilate_size = cv2.getTrackbarPos(str_DILATE_KERNEL, str_SETTINGS_W)
         if self.erode_size > 0:
@@ -320,7 +355,7 @@ def process_video(input=0, mirror=False):
         hsl = processor.toHls(raw)
         cv2.imshow('HSV', hsl)
 
-        asphalt = processor.takeAsphaltRegion(hsl)
+        asphalt = processor.calcAsphaltColorsKmean(hsl)
         # cv2.imshow('Asphalt', asphalt)
 
         # further processing for below-horizon part only to increase performance
