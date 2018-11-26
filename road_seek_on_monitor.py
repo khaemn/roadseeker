@@ -18,38 +18,11 @@ def process_image():
         raw = np.array(img)
 
         hls = processor.toHls(raw)
-        # cv2.imshow('HSV', hsl)
 
-        # asphalt = processor.calcAsphaltColorsHistHLS(hls)
-        # cv2.imshow('Asphalt HSL', asphalt)
-
-        # thresholdedAnd = processor.thresholdedByAnd(hsl)
-        # cv2.imshow('And Threshold HSL', thresholdedAnd)
-
-        thresholdedOr = processor.thresholdedBy3Hist(hls)
-        # cv2.imshow('Or Threshold HSL', thresholdedOr)
-
-        # thresholdedOnlyHue = processor.thresholdedOnlyHue(hsl)
-        # cv2.imshow('Hue Threshold HSL', thresholdedOnlyHue)
+        thresholded = processor.thresholdedBy3Hist(hls)
 
         cutted = processor.plotInfo(hls)
-        cv2.imshow('Processed HSL', np.concatenate((cutted, thresholdedOr), axis=1))
-
-        # asphalt = processor.calcAsphaltColorsKmean(raw)
-        # # cv2.imshow('Asphalt', asphalt)
-        #
-        # # thresholdedAnd = processor.thresholdedByAnd(img)
-        # # cv2.imshow('And Threshold', thresholdedAnd)
-        #
-        # thresholdedOr = processor.thresholdedByOr(raw)
-        # # cv2.imshow('Or Threshold', thresholdedOr)
-        #
-        # # thresholdedOnlyHue = processor.thresholdedOnlyHue(img)
-        # # cv2.imshow('Hue Threshold', thresholdedOnlyHue)
-        #
-        # cutted = processor.plotInfo(raw)
-        # # cv2.imshow('Cutted', cutted)
-        # cv2.imshow('Processed RGB', np.concatenate((cutted, thresholdedOr), axis=1))
+        cv2.imshow('Processed HSL', np.concatenate((cutted, thresholded), axis=1))
 
         if cv2.waitKey(10) == 27:
             cv2.destroyAllWindows()
@@ -59,3 +32,28 @@ def process_image():
 processor = RoadSeeker()
 
 process_image()
+
+
+
+
+
+
+
+
+
+
+# asphalt = processor.calcAsphaltColorsKmean(raw)
+# # cv2.imshow('Asphalt', asphalt)
+#
+# # thresholdedAnd = processor.thresholdedByAnd(img)
+# # cv2.imshow('And Threshold', thresholdedAnd)
+#
+# thresholdedOr = processor.thresholdedByOr(raw)
+# # cv2.imshow('Or Threshold', thresholdedOr)
+#
+# # thresholdedOnlyHue = processor.thresholdedOnlyHue(img)
+# # cv2.imshow('Hue Threshold', thresholdedOnlyHue)
+#
+# cutted = processor.plotInfo(raw)
+# # cv2.imshow('Cutted', cutted)
+# cv2.imshow('Processed RGB', np.concatenate((cutted, thresholdedOr), axis=1))

@@ -48,7 +48,7 @@ class RoadSeeker:
 
 
     min_lightness = 120
-    min_red = 110
+    min_red = 4
     canny_min = 100
     canny_max = 200
     erode_size = 2
@@ -364,7 +364,7 @@ class RoadSeeker:
     def thresholdedBy3Hist(self, _input):
         self.readThresholdingParams()
         (_height, _width, _) = _input.shape
-        resample_ratio = 5
+        resample_ratio = 2
         resamle = cv2.resize(_input, (int(_width/resample_ratio), int(_height/resample_ratio)))
 
         lo, hi = self.calcAsphaltColorBoundaries(_input)
@@ -381,6 +381,7 @@ class RoadSeeker:
         cv2.imshow('Fullmask', fullmask)
         mask_rgb = cv2.cvtColor(fullmask, cv2.COLOR_GRAY2BGR)
         mask_rgb = cv2.resize(mask_rgb, (_width, _height))
+        mask_rgb = cv2.blur(mask_rgb, (self.erode_size+1, self.erode_size+1))
         frame = _input & mask_rgb
 
         return frame
@@ -423,6 +424,7 @@ class RoadSeeker:
             self.erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.erode_size, self.erode_size * 2))
         if self.dilate_size > 0:
             self.dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.dilate_size, self.dilate_size * 2))
+        self.min_red = cv2.getTrackbarPos(str_MIN_RED, str_SETTINGS_W)
 
     def edges(self, _input):
         self.canny_min = cv2.getTrackbarPos(str_MIN_CANNY, str_SETTINGS_W)
@@ -512,11 +514,11 @@ def process_video(input=0, mirror=False):
 
         hls = processor.toHls(raw)
 
-        asphalt = processor.calcAsphaltColorsHistHLS(hls)
+        # asphalt = processor.calcAsphaltColorsHistHLS(hls)
 
-        thresholdedOr = processor.thresholdedOnlyHue(hls)
+        thresholdedOr = processor.thresholdedBy3Hist(hls)
 
-        cutted = processor.plotInfo(hls)
+        cutted = processor.plotInfo(raw)
         cv2.imshow('Processed HSL', np.concatenate((cutted, thresholdedOr), axis=1))
 
         #asphalt = processor.calcAsphaltColorsKmean(raw)
@@ -526,11 +528,11 @@ def process_video(input=0, mirror=False):
         #cutted = processor.plotInfo(raw)
         #cv2.imshow('Processed RGB', np.concatenate((cutted, thresholdedOr), axis=1))
 
-        cv2.imshow('Lane', processor.driving_lane(raw))
+        cv2.imshow('Lane', cv2.blur(thresholdedOr, (5,5)))
 
         if cv2.waitKey(1) == 27:
             break  # esc to quit
     cv2.destroyAllWindows()
 
-#process_video('video/road6.mp4')
+process_video('video/road6.mp4')
 # process_video()
