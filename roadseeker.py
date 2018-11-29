@@ -1,3 +1,5 @@
+# Inspired by Udacity https://github.com/Heych88/udacity-sdcnd-advanced-lane-finding/
+
 import cv2
 import imutils
 from collections import namedtuple
@@ -20,7 +22,9 @@ str_ASPHALT_WIDTH = 'Asphalt box width'
 str_ASPHALT_COLORS = 'N asphalt colors'
 
 str_MIN_LIGHTNESS = 'Lightness min'
-str_MIN_RED = 'Lightness min'
+str_MIN_RED = 'R min'
+str_FOCUS_X= 'Focus X'
+str_FOCUS_Y= 'Focus Y'
 str_ERODE_KERNEL = 'Erode kernel'
 str_DILATE_KERNEL = 'Dilate kernel'
 str_ASPHALT_HUE_THRESHOLD_SPREAD = 'Hue spread'
@@ -38,6 +42,8 @@ class RoadSeeker:
     road_search_area = SearchArea(.45, .85, .1, .1)
     insignificant_area = SearchArea(0., 0., 1., .4)
     horizon = 0.35  # horizon line in respectance to frame heightm starting from top
+    focal_point = Point(0, 0)
+    roi_region = [Point(0, 0), Point(0, 0), Point(0, 0), Point(0, 0)]
     line_width = 2
     search_color = (0, 255, 0)
     asphalt_colors = [(0, 0, 0)]
@@ -78,10 +84,10 @@ class RoadSeeker:
         cv2.createTrackbar(str_DILATE_KERNEL, str_SETTINGS_W, 1, 30, self.control_moved)
         cv2.setTrackbarPos(str_DILATE_KERNEL, str_SETTINGS_W, self.dilate_size)
 
-        cv2.createTrackbar(str_MIN_CANNY, str_SETTINGS_W, 1, 200, self.control_moved)
-        cv2.setTrackbarPos(str_MIN_CANNY, str_SETTINGS_W, self.canny_min)
-        cv2.createTrackbar(str_MAX_CANNY, str_SETTINGS_W, 1, 200, self.control_moved)
-        cv2.setTrackbarPos(str_MAX_CANNY, str_SETTINGS_W, self.canny_max)
+        # cv2.createTrackbar(str_MIN_CANNY, str_SETTINGS_W, 1, 200, self.control_moved)
+        # cv2.setTrackbarPos(str_MIN_CANNY, str_SETTINGS_W, self.canny_min)
+        # cv2.createTrackbar(str_MAX_CANNY, str_SETTINGS_W, 1, 200, self.control_moved)
+        # cv2.setTrackbarPos(str_MAX_CANNY, str_SETTINGS_W, self.canny_max)
 
         cv2.createTrackbar(str_ASPHALT_LEFT, str_SETTINGS_W, 1, 100, self.control_moved)
         cv2.setTrackbarPos(str_ASPHALT_LEFT, str_SETTINGS_W, int(self.road_search_area.left * 100))
@@ -90,14 +96,19 @@ class RoadSeeker:
         cv2.createTrackbar(str_ASPHALT_WIDTH, str_SETTINGS_W, 1, 100, self.control_moved)
         cv2.setTrackbarPos(str_ASPHALT_WIDTH, str_SETTINGS_W, int(self.road_search_area.width * 100))
 
-        cv2.createTrackbar(str_MIN_LIGHTNESS, str_SETTINGS_W, 1, 255, self.control_moved)
-        cv2.setTrackbarPos(str_MIN_LIGHTNESS, str_SETTINGS_W, self.min_lightness)
+        cv2.createTrackbar(str_FOCUS_X, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.setTrackbarPos(str_FOCUS_X, str_SETTINGS_W, 50)
+        cv2.createTrackbar(str_FOCUS_Y, str_SETTINGS_W, 1, 100, self.control_moved)
+        cv2.setTrackbarPos(str_FOCUS_Y, str_SETTINGS_W, 50)
 
         cv2.createTrackbar(str_MIN_LIGHTNESS, str_SETTINGS_W, 1, 255, self.control_moved)
         cv2.setTrackbarPos(str_MIN_LIGHTNESS, str_SETTINGS_W, self.min_lightness)
 
-        cv2.createTrackbar('R min', str_SETTINGS_W, 1, 255, self.control_moved)
-        cv2.setTrackbarPos('R min', str_SETTINGS_W, self.min_red)
+        cv2.createTrackbar(str_MIN_LIGHTNESS, str_SETTINGS_W, 1, 255, self.control_moved)
+        cv2.setTrackbarPos(str_MIN_LIGHTNESS, str_SETTINGS_W, self.min_lightness)
+
+        cv2.createTrackbar(str_MIN_RED, str_SETTINGS_W, 1, 255, self.control_moved)
+        cv2.setTrackbarPos(str_MIN_RED, str_SETTINGS_W, self.min_red)
 
         cv2.createTrackbar(str_ASPHALT_COLORS, str_SETTINGS_W, 1, 50, self.control_moved)
         cv2.setTrackbarPos(str_ASPHALT_COLORS, str_SETTINGS_W, self.n_road_colors)
@@ -136,6 +147,9 @@ class RoadSeeker:
                                            cv2.getTrackbarPos(str_ASPHALT_TOP, str_SETTINGS_W) / 100,
                                            cv2.getTrackbarPos(str_ASPHALT_WIDTH, str_SETTINGS_W) / 100,
                                            self.road_search_area.height)
+        focus_x = int(_width * cv2.getTrackbarPos(str_FOCUS_X, str_SETTINGS_W) / 100)
+        focus_y = int(_width * cv2.getTrackbarPos(str_FOCUS_Y, str_SETTINGS_W) / 100)
+        self.focal_point = Point(focus_x, focus_y)
         p1, p2 = RoadSeeker.rectangleVertexes(_width, _height, self.road_search_area)
         asphalt = _input[p1.y:p2.y, p1.x:p2.x]
         return asphalt
@@ -364,7 +378,7 @@ class RoadSeeker:
     def thresholdedBy3Hist(self, _input):
         self.readThresholdingParams()
         (_height, _width, _) = _input.shape
-        resample_ratio = 2
+        resample_ratio = 5
         resamle = cv2.resize(_input, (int(_width/resample_ratio), int(_height/resample_ratio)))
 
         lo, hi = self.calcAsphaltColorBoundaries(_input)
@@ -431,15 +445,6 @@ class RoadSeeker:
         self.canny_min = cv2.getTrackbarPos(str_MAX_CANNY, str_SETTINGS_W)
         edges = cv2.Canny(_input, self.canny_min, self.canny_min)
         return edges
-
-    def significant(self, _input):
-        _width, _height = _input.shape[1], _input.shape[0]
-        return _input[int(_height * self.horizon):_height, 0:_width]
-
-    def erode(self, _input):
-        _width, _height = _input.shape[1], _input.shape[0]
-        eroded = cv2.erode(_input)
-        return _input[int(_height * self.horizon):_height, 0:_width]
 
     def driving_lane(self, image):
         # function that finds the road driving lane line
@@ -509,20 +514,42 @@ class RoadSeeker:
         warped = cv2.warpPerspective(_input, M, (maxWidth, maxHeight))
         return warped
 
-    def roiVertexes(self, _input):
+    def roiVertexes(self, _input, _focal_point=None, _source_pts=None, _roi_height=None):
         (_height, _width, _) = _input.shape
-        top = int(_height / 2)
-        padding = int(_width / 3)
-        tl, tr, bl, br = Point(padding,top), Point(_width-padding, top), Point(0,_height), Point(_width, _height)
-        points = np.array([[tl.x, tl.y],
+        if _focal_point is None:
+            # default focal point is screen center
+            _focal_point = self.focal_point
+        if _source_pts is None:
+            # default bottom points are at bottom screen corners
+            _source_pts = [Point(0, _height), Point(_width, _height)]
+        if _roi_height is None:
+            # default roi height is a distance from bottom to horizon
+            _roi_height = _focal_point.y + 10
+
+        m_left = (_focal_point.y - _source_pts[0][1]) / (_focal_point.x - _source_pts[0].x)
+        b_left = _focal_point.y - (m_left * _focal_point.x)
+        x_left = (_roi_height - b_left) // m_left
+
+        m_right = (_focal_point.y - _source_pts[1][1]) / (_focal_point.x - _source_pts[1].x)
+        b_right = _focal_point.y - (m_right * _focal_point.x)
+        x_right = (_roi_height - b_right) // m_right
+
+        tl = Point(x_left, _roi_height)
+        tr = Point(x_right, _roi_height)
+        bl, fp, br = _source_pts[0], _focal_point, _source_pts[1]
+        self.roi_region = [bl, fp, fp, br]
+        points = np.array([[bl.x, bl.y],
+                           [tl.x, tl.y],
                            [tr.x, tr.y],
-                           [br.x, br.y],
-                           [bl.x, bl.y]])
+                           [br.x, br.y]])
         return points
 
     def plotRoiBorder(self, _input):
+        (_height, _width, _) = _input.shape
         points = self.roiVertexes(_input)
-        cv2.polylines(_input, np.int32([points]), 1, (100,10,10), thickness=2)
+        color = (100,10,10)
+        cv2.polylines(_input, np.int32([points]), 1, color, thickness=2)
+        cv2.circle(_input, (self.focal_point.x, self.focal_point.y), 5, color, 2)
 
 
 
@@ -589,5 +616,5 @@ def process_video(input=0, mirror=False):
             break  # esc to quit
     cv2.destroyAllWindows()
 
-process_video('video/road6.mp4')
+process_video('video/road1.mp4')
 # process_video()
