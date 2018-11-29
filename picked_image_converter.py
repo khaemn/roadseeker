@@ -1,4 +1,5 @@
 import numpy as np
+import csv
 import PIL
 import numpy
 import random
@@ -31,10 +32,21 @@ total_files = len(models)
 
 for i in range(0, total_files):
 
-    # Should be parsed from the Model file.
-    pixel_grid_size = 100
-    origin_width = 12  # 1280
-    origin_height = 7  # 720
+    model_file = open(os.path.join(root_back, models[i]), 'r')
+    csv_reader = csv.reader(model_file, delimiter=',')
+    model_data = []
+    for row in csv_reader:
+        model_data.append(row)
+
+    (pixel_grid_size, origin_width, origin_height) = model_data[0]
+    model_data.remove(model_data[0])
+    pixel_grid_size, origin_width, origin_height = int(pixel_grid_size), int(origin_width), int(origin_height)
+
+    model = np.zeros((origin_width, origin_height))
+    for record in model_data:
+        (_x, _y, _state) = record
+        _x, _y, _state = int(_x), int(_y), int(_state)
+        model[_x, _y] = _state
 
     # TODO: parse model file
     img = Image.open(os.path.join(root_back, images[i]))
@@ -49,8 +61,6 @@ for i in range(0, total_files):
                            x * pixel_grid_size : (x+1) * pixel_grid_size]
             output = Image.fromarray(cropped, "RGB")
 
-            contains_selection = True  # TODO: read from model via xy coords
+            contains_selection = (model[x, y] > 0)
             output_path = _OUTPUT_DIR_1 if contains_selection else _OUTPUT_DIR_0
             output.save(os.path.join(output_path, "_" + str(x) + "_" + str(y) + "_" + images[i]))
-
-    quit()
