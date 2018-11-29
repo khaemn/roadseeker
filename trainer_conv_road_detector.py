@@ -6,28 +6,40 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import Activation, Dropout, Flatten, Dense
 from keras import backend as K
 
+
+_MODEL_FILENAME = 'models/model_road_detector.h5'
+
 from PIL import Image
 import os
 import numpy as np
 
-_MODEL_FILENAME = 'models/model_road_detector.h5'
+def __test__():
+    _model = load_model(_MODEL_FILENAME)
 
+    imgdata = []
+    imgdata.append(np.asarray(Image.open('train/generated/empty/_0_0_road2_5.jpg'), dtype='uint8'))
+    imgdata.append(np.asarray(Image.open('train/generated/empty/_0_3_road1_39.jpg'), dtype='uint8'))
+    imgdata.append(np.asarray(Image.open('train/generated/empty/_2_1_road1_15.jpg'), dtype='uint8'))
+    # imgdata.append(np.asarray(Image.open('train/generated/road/_3_5_road3_29.jpg'), dtype='uint8'))
+    # imgdata.append(np.asarray(Image.open('train/generated/road/_5_5_road6_44.jpg'), dtype='uint8'))
+    imgdata.append(np.asarray(Image.open('train/generated/road/_0_5_road2_4.jpg'), dtype='uint8'))
+    imgdata.append(np.asarray(Image.open('train/generated/road/_0_5_road2_6.jpg'), dtype='uint8'))
+    imgdata.append(np.asarray(Image.open('train/generated/road/_0_5_road2_7.jpg'), dtype='uint8'))
 
-# model = load_model(_MODEL_FILENAME)
-#
-# # img = Image.open('generated/0/_0_0_road2_6.jpg')
-# img = Image.open('generated/1/_0_5_road2_5.jpg')
-# try:
-#     data = np.asarray(img, dtype='uint8')
-# except SystemError:
-#     data = np.asarray(img.getdata(), dtype='uint8')
-#
-# # Adding an extra dimension for matcing input shape
-# data = np.expand_dims(data, axis=0)
-#
-# print(model.predict(data))
-#
-# quit()
+    # img_true = Image.open('train/generated/road/_0_5_road3_3.jpg')
+    # data1 = np.asarray(img_false
+    # data2 = np.asarray(img_true, dtype='uint8')
+    # try:
+    # except SystemError:
+    #     data = np.asarray(img.getdata(), dtype='uint8')
+
+    # Adding an extra dimension for matcing input shape
+    # data = np.expand_dims(data, axis=0)
+    data = np.array(imgdata)
+
+    print(_model.predict(data))
+
+    #quit()
 
 
 
@@ -38,10 +50,10 @@ img_width, img_height = 100, 100
 
 train_data_dir = 'train/generated'
 validation_data_dir = 'train/validation'
-nb_train_samples = 100
-nb_validation_samples = 10
+nb_train_samples = 1000
+nb_validation_samples = 100
 epochs = 50
-batch_size = 16
+batch_size = 1#16
 
 if K.image_data_format() == 'channels_first':
     input_shape = (3, img_width, img_height)
@@ -72,7 +84,10 @@ model.compile(loss='binary_crossentropy',
               optimizer='rmsprop',
               metrics=['accuracy'])
 
-model.load_weights('first_try.h5')
+# Comment various thing here to make model train or saving from weights only
+model.load_weights('weights/road_trial_49.h5')
+# model.save(_MODEL_FILENAME)
+# quit()
 
 # this is the augmentation configuration we will use for training
 train_datagen = ImageDataGenerator(
@@ -97,13 +112,17 @@ validation_generator = test_datagen.flow_from_directory(
     batch_size=batch_size,
     class_mode='binary')
 
-model.fit_generator(
-    train_generator,
-    steps_per_epoch=nb_train_samples // batch_size,
-    epochs=epochs,
-    #validation_data=validation_generator,
-    #validation_steps=int(nb_validation_samples // batch_size)
-    )
+for i in range(0, epochs):
+    print("Iteration ", i, " of ", epochs)
+    # __test__()
+    model.fit_generator(
+        train_generator,
+        steps_per_epoch=nb_train_samples // batch_size,
+        epochs=1,
+        validation_data=validation_generator,
+        validation_steps=int(nb_validation_samples // batch_size),
+        workers=8)
+    model.save_weights('weights/road_trial_' + str(i) + '.h5')
+    model.save(_MODEL_FILENAME)
+    __test__()
 
-model.save_weights('first_try.h5')
-model.save(_MODEL_FILENAME)

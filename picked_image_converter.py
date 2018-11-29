@@ -9,8 +9,8 @@ import os
 
 # TODO: parse command line args
 _INPUT_DIR = './road2'
-_OUTPUT_DIR_0 = './generated/0'
-_OUTPUT_DIR_1 = './generated/1'
+_OUTPUT_DIR_0 = './train/generated/empty'
+_OUTPUT_DIR_1 = './train/generated/road'
 
 _ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', 'jpeg']
 _MODEL_EXTENSION = '.txt'
@@ -26,6 +26,8 @@ for root_back, dirs_back, files_back in os.walk(_INPUT_DIR):
         if(_file.endswith(_MODEL_EXTENSION)):
             models.append(_file)
 
+models.sort()
+images.sort()
 
 assert len(models) == len(images)
 total_files = len(models)
@@ -59,7 +61,13 @@ for i in range(0, total_files):
         for y in range (0, origin_height - 1):
             cropped = data[y * pixel_grid_size : (y+1) * pixel_grid_size,
                            x * pixel_grid_size : (x+1) * pixel_grid_size]
-            output = Image.fromarray(cropped, "RGB")
+
+            if cropped.shape[0] != cropped.shape[1]:
+                pass
+            try:
+                output = Image.fromarray(cropped, "RGB")
+            except ValueError:
+                pass
 
             contains_selection = (model[x, y] > 0)
             output_path = _OUTPUT_DIR_1 if contains_selection else _OUTPUT_DIR_0
