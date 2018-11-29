@@ -14,14 +14,15 @@ import os
 import numpy as np
 
 def __test__():
+    return
     _model = load_model(_MODEL_FILENAME)
 
     imgdata = []
     imgdata.append(np.asarray(Image.open('train/generated/empty/_0_0_road2_5.jpg'), dtype='uint8'))
     imgdata.append(np.asarray(Image.open('train/generated/empty/_0_3_road1_39.jpg'), dtype='uint8'))
     imgdata.append(np.asarray(Image.open('train/generated/empty/_2_1_road1_15.jpg'), dtype='uint8'))
-    # imgdata.append(np.asarray(Image.open('train/generated/road/_3_5_road3_29.jpg'), dtype='uint8'))
-    # imgdata.append(np.asarray(Image.open('train/generated/road/_5_5_road6_44.jpg'), dtype='uint8'))
+    imgdata.append(np.asarray(Image.open('train/generated/road/_3_5_road3_29.jpg'), dtype='uint8'))
+    imgdata.append(np.asarray(Image.open('train/generated/road/_5_5_road6_44.jpg'), dtype='uint8'))
     imgdata.append(np.asarray(Image.open('train/generated/road/_0_5_road2_4.jpg'), dtype='uint8'))
     imgdata.append(np.asarray(Image.open('train/generated/road/_0_5_road2_6.jpg'), dtype='uint8'))
     imgdata.append(np.asarray(Image.open('train/generated/road/_0_5_road2_7.jpg'), dtype='uint8'))
@@ -50,10 +51,10 @@ img_width, img_height = 100, 100
 
 train_data_dir = 'train/generated'
 validation_data_dir = 'train/validation'
-nb_train_samples = 1000
-nb_validation_samples = 100
+nb_train_samples = 5000
+nb_validation_samples = 10
 epochs = 50
-batch_size = 1#16
+batch_size = 8  # 16
 
 if K.image_data_format() == 'channels_first':
     input_shape = (3, img_width, img_height)
@@ -85,15 +86,15 @@ model.compile(loss='binary_crossentropy',
               metrics=['accuracy'])
 
 # Comment various thing here to make model train or saving from weights only
-model.load_weights('weights/road_trial_49.h5')
-# model.save(_MODEL_FILENAME)
-# quit()
+model.load_weights('weights/road_trial_3.h5')
+model.save(_MODEL_FILENAME)
+quit()
 
 # this is the augmentation configuration we will use for training
 train_datagen = ImageDataGenerator(
     rescale=1. / 255,
-    shear_range=0.2,
-    zoom_range=0.2,
+    shear_range=0.05,
+    zoom_range=0.05,
     horizontal_flip=True)
 
 # this is the augmentation configuration we will use for testing:
@@ -118,7 +119,7 @@ for i in range(0, epochs):
     model.fit_generator(
         train_generator,
         steps_per_epoch=nb_train_samples // batch_size,
-        epochs=1,
+        epochs=4,
         validation_data=validation_generator,
         validation_steps=int(nb_validation_samples // batch_size),
         workers=8)

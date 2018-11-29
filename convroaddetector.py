@@ -22,12 +22,12 @@ class ConvDetector:
 from PIL import Image
 import numpy as np
 
-img = Image.open('road2/road6_0.jpg')
+img = Image.open('road2/road6_11.jpg')
 data = np.asarray(img, dtype='uint8')
 
 detector = ConvDetector(_MODEL_FILENAME)
 inputs = []
-for x in range(0, 10):
+for x in range(0, 12):
     for y in range(0, 7):
         inputs.append(data[100*y:100*(y+1), 100*x:100*(x+1)])
 inputs = np.array(inputs)
