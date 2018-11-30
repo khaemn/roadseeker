@@ -5,9 +5,12 @@ from keras.models import Sequential, load_model
 from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import Activation, Dropout, Flatten, Dense
 from keras import backend as K
+import matplotlib.pyplot as plt
 
 
 _MODEL_FILENAME = 'models/model_road_detector.h5'
+
+_PLOT_BATCH = True
 
 from PIL import Image
 import os
@@ -51,10 +54,44 @@ img_width, img_height = 100, 100
 
 train_data_dir = 'train/generated'
 validation_data_dir = 'train/validation'
-nb_train_samples = 1000
-nb_validation_samples = 50
-epochs = 50
-batch_size = 1  # 16
+nb_train_samples = 100 #00
+nb_validation_samples = 10
+epochs = 10
+batch_size = 4  # 16
+
+# this is the augmentation configuration we will use for training
+train_datagen = ImageDataGenerator(
+    rescale=1. / 255,
+    shear_range=0.1,
+    zoom_range=0.1,
+    horizontal_flip=True,
+    #horizontal_flip=False
+)
+
+# this is the augmentation configuration we will use for testing:
+# only rescaling
+test_datagen = ImageDataGenerator(rescale=1. / 255)
+
+train_generator = train_datagen.flow_from_directory(
+    train_data_dir,
+    target_size=(img_width, img_height),
+    batch_size=batch_size,
+    class_mode='binary')
+
+validation_generator = test_datagen.flow_from_directory(
+    validation_data_dir,
+    target_size=(img_width, img_height),
+    batch_size=batch_size,
+    class_mode='binary')
+
+if _PLOT_BATCH:
+    x_batch, y_batch = next(train_generator)
+    for i in range (0, batch_size):
+        image = x_batch[i]
+        plt.imshow(image)
+        plt.show()
+    quit()
+
 
 if K.image_data_format() == 'channels_first':
     input_shape = (3, img_width, img_height)
@@ -91,30 +128,6 @@ model.compile(loss='binary_crossentropy',
 # model.save(_MODEL_FILENAME)
 # quit()
 
-# this is the augmentation configuration we will use for training
-train_datagen = ImageDataGenerator(
-    rescale=1. / 255,
-    shear_range=0.01,
-    zoom_range=0.01,
-    # horizontal_flip=True,
-    horizontal_flip=False
-)
-
-# this is the augmentation configuration we will use for testing:
-# only rescaling
-test_datagen = ImageDataGenerator(rescale=1. / 255)
-
-train_generator = train_datagen.flow_from_directory(
-    train_data_dir,
-    target_size=(img_width, img_height),
-    batch_size=batch_size,
-    class_mode='binary')
-
-validation_generator = test_datagen.flow_from_directory(
-    validation_data_dir,
-    target_size=(img_width, img_height),
-    batch_size=batch_size,
-    class_mode='binary')
 
 for i in range(0, epochs):
     print("Iteration ", i, " of ", epochs)

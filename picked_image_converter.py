@@ -1,14 +1,11 @@
 import numpy as np
 import csv
-import PIL
-import numpy
-import random
 from PIL import Image
-from os import listdir
 import os
 
 # TODO: parse command line args
-_INPUT_DIR = './road2'
+#_INPUT_DIR = './road2'
+_INPUT_DIR = './test_datasets'
 _OUTPUT_DIR_0 = './train/generated/empty'
 _OUTPUT_DIR_1 = './train/generated/road'
 
@@ -69,6 +66,9 @@ for i in range(0, total_files):
             except ValueError:
                 pass
 
-            contains_selection = (model[x, y] > 0)
-            output_path = _OUTPUT_DIR_1 if contains_selection else _OUTPUT_DIR_0
-            output.save(os.path.join(output_path, "_" + str(x) + "_" + str(y) + "_" + images[i]))
+            output_path = _OUTPUT_DIR_1
+            if model[x, y] == 0:
+                output_path = _OUTPUT_DIR_0
+            if model[x, y] >= 0:
+                output.save(os.path.join(output_path, "_" + str(x) + "_" + str(y) + "_" + images[i]))
+            # else do not save at all (unused)
