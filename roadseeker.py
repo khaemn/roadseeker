@@ -7,6 +7,7 @@ import typing
 import numpy as np
 import edge
 import heapq
+import convroaddetector as CVD
 
 Point = typing.NamedTuple("Point", [('x', int), ('y', int)])
 
@@ -556,15 +557,16 @@ class RoadSeeker:
 def process_video(input=0, mirror=False):
     processor = RoadSeeker()
     cam = cv2.VideoCapture(input)
+    detector = CVD.ConvDetector(CVD._MODEL_FILENAME)
 
     while True:
-        ret_val, raw = cam.read()
+        ret_val, original = cam.read()
         if not ret_val:
             print("No video frame captured: video at end or no video present.")
             quit()
 
         # First of all to increase perfomance we work with small video
-        raw = imutils.resize(raw, _VIDEO_WIDTH)
+        raw = imutils.resize(original, _VIDEO_WIDTH)
 
 
         # hsl = processor.toHls(raw)
@@ -612,9 +614,11 @@ def process_video(input=0, mirror=False):
 
         cv2.imshow('Lane', cv2.blur(thresholdedOr, (5,5)))
 
+        cv2.imshow('Detector', detector.process(original))
+
         if cv2.waitKey(1) == 27:
             break  # esc to quit
     cv2.destroyAllWindows()
 
-process_video('video/road1.mp4')
+process_video('video/road6.mp4')
 # process_video()

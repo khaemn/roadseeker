@@ -51,10 +51,10 @@ img_width, img_height = 100, 100
 
 train_data_dir = 'train/generated'
 validation_data_dir = 'train/validation'
-nb_train_samples = 5000
-nb_validation_samples = 10
+nb_train_samples = 1000
+nb_validation_samples = 50
 epochs = 50
-batch_size = 8  # 16
+batch_size = 1  # 16
 
 if K.image_data_format() == 'channels_first':
     input_shape = (3, img_width, img_height)
@@ -82,20 +82,23 @@ model.add(Dense(1))
 model.add(Activation('sigmoid'))
 
 model.compile(loss='binary_crossentropy',
-              optimizer='rmsprop',
+              # optimizer='rmsprop',
+              optimizer='adam',
               metrics=['accuracy'])
 
 # Comment various thing here to make model train or saving from weights only
-model.load_weights('weights/road_trial_3.h5')
-model.save(_MODEL_FILENAME)
-quit()
+# model.load_weights('weights/road_trial_2.h5')
+# model.save(_MODEL_FILENAME)
+# quit()
 
 # this is the augmentation configuration we will use for training
 train_datagen = ImageDataGenerator(
     rescale=1. / 255,
-    shear_range=0.05,
-    zoom_range=0.05,
-    horizontal_flip=True)
+    shear_range=0.01,
+    zoom_range=0.01,
+    # horizontal_flip=True,
+    horizontal_flip=False
+)
 
 # this is the augmentation configuration we will use for testing:
 # only rescaling
@@ -119,10 +122,11 @@ for i in range(0, epochs):
     model.fit_generator(
         train_generator,
         steps_per_epoch=nb_train_samples // batch_size,
-        epochs=4,
+        epochs=epochs,
         validation_data=validation_generator,
         validation_steps=int(nb_validation_samples // batch_size),
-        workers=8)
+        workers=8,
+        verbose=2)
     model.save_weights('weights/road_trial_' + str(i) + '.h5')
     model.save(_MODEL_FILENAME)
     __test__()
