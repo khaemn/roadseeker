@@ -2,12 +2,14 @@ import numpy as np
 import csv
 from PIL import Image
 import os
+import cv2
 
 # TODO: parse command line args
-#_INPUT_DIR = './road2'
-_INPUT_DIR = './test_datasets'
+_INPUT_DIR = './road2'
+#_INPUT_DIR = './test_datasets'
 _OUTPUT_DIR_0 = './train/generated/empty'
 _OUTPUT_DIR_1 = './train/generated/road'
+_CONVERT_TO_HSL = True
 
 _ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', 'jpeg']
 _MODEL_EXTENSION = '.txt'
@@ -48,27 +50,33 @@ for i in range(0, total_files):
         model[_x, _y] = _state
 
     # TODO: parse model file
-    img = Image.open(os.path.join(root_back, images[i]))
-    try:
-        data = np.asarray(img, dtype='uint8')
-    except SystemError:
-        data = np.asarray(img.getdata(), dtype='uint8')
+    img = cv2.imread(os.path.join(root_back, images[i]))
+    # try:
+    #     data = np.asarray(img, dtype='uint8')
+    # except SystemError:
+    #     data = np.asarray(img.getdata(), dtype='uint8')
 
     for x in range(0, origin_width - 1):
         for y in range (0, origin_height - 1):
-            cropped = data[y * pixel_grid_size : (y+1) * pixel_grid_size,
+            cropped = img[y * pixel_grid_size : (y+1) * pixel_grid_size,
                            x * pixel_grid_size : (x+1) * pixel_grid_size]
 
-            if cropped.shape[0] != cropped.shape[1]:
-                pass
-            try:
-                output = Image.fromarray(cropped, "RGB")
-            except ValueError:
-                pass
+            if _CONVERT_TO_HSL:
+                cropped = cv2.cvtColor(cropped, cv2.COLOR_BGR2HLS)
 
-            output_path = _OUTPUT_DIR_1
-            if model[x, y] == 0:
-                output_path = _OUTPUT_DIR_0
-            if model[x, y] >= 0:
+            # if cropped.shape[0] != cropped.shape[1]:
+            #     pass
+            # try:
+            output = Image.fromarray(cropped, "RGB")
+            # except ValueError:
+            #     pass
+
+            state = model[x, y]
+
+            if state >= 0:
+                output_path = _OUTPUT_DIR_1
+                if state == 0:
+                    output_path = _OUTPUT_DIR_0
+
                 output.save(os.path.join(output_path, "_" + str(x) + "_" + str(y) + "_" + images[i]))
             # else do not save at all (unused)

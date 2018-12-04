@@ -4,6 +4,7 @@ import math
 import numpy as np
 
 _MODEL_FILENAME = 'models/model_road_detector.h5'
+_CONVERT_TO_HSL = True
 
 
 class ConvDetector:
@@ -24,7 +25,6 @@ class ConvDetector:
         return self.model.predict(_input)
 
     def process(self, _img):
-        cv2.imshow('Input', _img)
         (_height, _width, _) = _img.shape
         max_x = math.floor(_width / self.resolution)
         max_y = math.floor(_height / self.resolution)
@@ -41,6 +41,8 @@ class ConvDetector:
         assert len(prediction) == max_x * max_y
         _overlay = _img.copy()
         _output = _img.copy()
+        if _CONVERT_TO_HSL:
+            _output = cv2.cvtColor(_output, cv2.COLOR_HLS2BGR)
 
         for x in range(0, max_x):
             for y in range(0, max_y):
@@ -59,18 +61,27 @@ class ConvDetector:
         return _output
 
 
+def __test__(filename):
+    # Self-testing, comment if not needed
+    # data = cv2.imread('road2/road6_12.jpg')
+    # data = cv2.imread('img/horverval2.jpg')
+    data = cv2.imread(filename)
+    (height, width, _) = data.shape
+    if width > 1300:
+        data = cv2.resize(data, (int(width / 2), int(height / 2)))
+    detector = ConvDetector(_MODEL_FILENAME)
 
-# Self-testing, comment if not needed
-# data = cv2.imread('road2/road6_12.jpg')
-# data = cv2.imread('img/horverval2.jpg')
-data = cv2.imread('test_datasets/lanes1.jpg')
-(height, width, _) = data.shape
-#if width > 1000:
-#    data = cv2.resize(data, (int(width / 2), int(height / 2)))
-detector = ConvDetector(_MODEL_FILENAME)
-detector.process(data)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+    if _CONVERT_TO_HSL:
+        data = cv2.cvtColor(data, cv2.COLOR_BGR2HLS)
+
+    detector.process(data)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
+__test__('img/lanes1.jpg')
+__test__('img/lanes2.jpg')
+__test__('img/lanes8.jpg')
+__test__('img/lanes6.jpg')
+__test__('img/lanes7.jpg')
 

@@ -6,47 +6,16 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import Activation, Dropout, Flatten, Dense
 from keras import backend as K
 import matplotlib.pyplot as plt
+#import convroaddetector as CVD
 
 
 _MODEL_FILENAME = 'models/model_road_detector.h5'
 
-_PLOT_BATCH = True
+_PLOT_BATCH = False
 
 from PIL import Image
 import os
 import numpy as np
-
-def __test__():
-    return
-    _model = load_model(_MODEL_FILENAME)
-
-    imgdata = []
-    imgdata.append(np.asarray(Image.open('train/generated/empty/_0_0_road2_5.jpg'), dtype='uint8'))
-    imgdata.append(np.asarray(Image.open('train/generated/empty/_0_3_road1_39.jpg'), dtype='uint8'))
-    imgdata.append(np.asarray(Image.open('train/generated/empty/_2_1_road1_15.jpg'), dtype='uint8'))
-    imgdata.append(np.asarray(Image.open('train/generated/road/_3_5_road3_29.jpg'), dtype='uint8'))
-    imgdata.append(np.asarray(Image.open('train/generated/road/_5_5_road6_44.jpg'), dtype='uint8'))
-    imgdata.append(np.asarray(Image.open('train/generated/road/_0_5_road2_4.jpg'), dtype='uint8'))
-    imgdata.append(np.asarray(Image.open('train/generated/road/_0_5_road2_6.jpg'), dtype='uint8'))
-    imgdata.append(np.asarray(Image.open('train/generated/road/_0_5_road2_7.jpg'), dtype='uint8'))
-
-    # img_true = Image.open('train/generated/road/_0_5_road3_3.jpg')
-    # data1 = np.asarray(img_false
-    # data2 = np.asarray(img_true, dtype='uint8')
-    # try:
-    # except SystemError:
-    #     data = np.asarray(img.getdata(), dtype='uint8')
-
-    # Adding an extra dimension for matcing input shape
-    # data = np.expand_dims(data, axis=0)
-    data = np.array(imgdata)
-
-    print(_model.predict(data))
-
-    #quit()
-
-
-
 
 
 # dimensions of our images.
@@ -54,16 +23,16 @@ img_width, img_height = 100, 100
 
 train_data_dir = 'train/generated'
 validation_data_dir = 'train/validation'
-nb_train_samples = 100 #00
-nb_validation_samples = 10
-epochs = 10
-batch_size = 4  # 16
+nb_train_samples = 5000 #00
+nb_validation_samples = 50
+epochs = 6
+batch_size = 32 # 16
 
 # this is the augmentation configuration we will use for training
 train_datagen = ImageDataGenerator(
     rescale=1. / 255,
-    shear_range=0.1,
-    zoom_range=0.1,
+    shear_range=0.051,
+    zoom_range=0.051,
     horizontal_flip=True,
     #horizontal_flip=False
 )
@@ -98,40 +67,70 @@ if K.image_data_format() == 'channels_first':
 else:
     input_shape = (img_width, img_height, 3)
 
+# model = Sequential()
+# model.add(Conv2D(32, (3, 3), input_shape=input_shape))
+# model.add(Activation('relu'))
+# model.add(MaxPooling2D(pool_size=(2, 2)))
+#
+# model.add(Conv2D(32, (3, 3)))
+# model.add(Activation('relu'))
+# model.add(MaxPooling2D(pool_size=(2, 2)))
+#
+# model.add(Conv2D(64, (3, 3)))
+# model.add(Activation('relu'))
+# model.add(MaxPooling2D(pool_size=(2, 2)))
+#
+# model.add(Flatten())
+# model.add(Dense(64))
+# model.add(Activation('relu'))
+# model.add(Dropout(0.5))
+# model.add(Dense(1))
+# model.add(Activation('sigmoid'))
+
+# Initialising the CNN
 model = Sequential()
-model.add(Conv2D(32, (3, 3), input_shape=input_shape))
-model.add(Activation('relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
 
-model.add(Conv2D(32, (3, 3)))
-model.add(Activation('relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-
-model.add(Conv2D(64, (3, 3)))
-model.add(Activation('relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Conv2D(64, (3, 3), input_shape=input_shape, activation='relu', name="Conv2D_1"))
+# model.add(MaxPooling2D(pool_size = (2, 2)))
+#model.add(Dropout(0.2))
+model.add(Conv2D(32, (5, 5), activation = 'relu', name="Conv2D_2"))
+# model.add(MaxPooling2D(pool_size = (2, 2)))
+#model.add(Dropout(0.2))
+model.add(Conv2D(32, (7, 7), activation = 'relu', name="Conv2D_3"))
+model.add(MaxPooling2D(pool_size = (4, 4)))
+model.add(Conv2D(32, (3, 3), activation = 'relu', name="Conv2D_4"))
+# model.add(MaxPooling2D(pool_size = (2, 2)))
+model.add(Dropout(0.5))
 
 model.add(Flatten())
-model.add(Dense(64))
-model.add(Activation('relu'))
-model.add(Dropout(0.5))
-model.add(Dense(1))
-model.add(Activation('sigmoid'))
 
-model.compile(loss='binary_crossentropy',
-              # optimizer='rmsprop',
-              optimizer='adam',
-              metrics=['accuracy'])
+# model.add(Dense(units=128, activation='relu'))
+model.add(Dense(units=32, activation='relu'))
+#model.add(Dropout(0.2))
+model.add(Dense(units=32, activation='relu'))
+model.add(Dropout(0.2))
+model.add(Dense(units=1, activation='sigmoid'))
+# Compiling the CNN
+model.compile(optimizer='adam'
+              #, loss='binary_crossentropy'
+              , loss='binary_crossentropy'
+              , metrics = ['binary_accuracy']
+              )
+
+# model.compile(loss='binary_crossentropy',
+#               # optimizer='rmsprop',
+#               optimizer='adam',
+#               metrics=['accuracy'])
 
 # Comment various thing here to make model train or saving from weights only
-# model.load_weights('weights/road_trial_2.h5')
+# model.load_weights('weights/road_trial_5.h5')
 # model.save(_MODEL_FILENAME)
+# CVD.__test__()
 # quit()
 
 
 for i in range(0, epochs):
     print("Iteration ", i, " of ", epochs)
-    # __test__()
     model.fit_generator(
         train_generator,
         steps_per_epoch=nb_train_samples // batch_size,
@@ -142,5 +141,5 @@ for i in range(0, epochs):
         verbose=2)
     model.save_weights('weights/road_trial_' + str(i) + '.h5')
     model.save(_MODEL_FILENAME)
-    __test__()
 
+#CVD.__test__()
