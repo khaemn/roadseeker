@@ -21,10 +21,10 @@ img_width, img_height = 100, 100
 
 train_data_dir = 'train/generated'
 validation_data_dir = 'train/validation'
-nb_train_samples = 1000 #00
-nb_validation_samples = 200
+nb_train_samples = 3000 #00
+nb_validation_samples = 600
 epochs = 5
-batch_size = 8 # 16
+batch_size = 32 # 16
 
 # this is the augmentation configuration we will use for training
 train_datagen = ImageDataGenerator(
@@ -83,8 +83,7 @@ model_init = "he_uniform"
 #model_init = "glorot_normal"
 #model_init = "uniform"
 
-model.add(Conv2D(8, (3, 3), kernel_initializer=model_init, input_shape=input_shape, activation='relu', name="Conv2D_1"))
-
+model.add(Conv2D(16, (5, 5), kernel_initializer=model_init, input_shape=input_shape, activation='relu', name="Conv2D_1"))
 model.add(Conv2D(16, (5, 5), kernel_initializer=model_init, activation = 'relu', name="Conv2D_10"))
 model.add(MaxPooling2D(pool_size=(8, 8)))
 model.add(Dropout(0.5))
@@ -100,7 +99,7 @@ model.compile(optimizer='adam'
               )
 
 # Comment various thing here to make model train or saving from weights only
-# model.load_weights('weights/road_trial_6.h5')
+# model.load_weights('weights/road_trial_1.h5')
 # model.save(_MODEL_FILENAME)
 # CVD.__test__()
 # quit()

@@ -13,7 +13,7 @@ class ConvDetector:
     line_width = 2
     true_color = (0, 255, 0)
     false_color = (0, 0, 255)
-    threshold = 0.1
+    threshold = 0.2
 
     def __init__(self, modelFile):
         self.model = load_model(modelFile)
@@ -54,17 +54,18 @@ class ConvDetector:
         for x in range(0, max_x):
             for y in range(0, max_y):
                 _index = (x*max_y) + y
-                _color = self.true_color if prediction[_index] > 0.5 + self.threshold else \
-                    self.false_color if prediction[_index] < 0.5 - self.threshold else (0,0,0)
+                yes = prediction[_index] > 0.5 + self.threshold
+                no = prediction[_index] < 0.5 - self.threshold
+                _color = self.true_color if yes else self.false_color if no else (0,0,0)
                 cv2.rectangle(_overlay,
                               (self.resolution * x, self.resolution * y),
                               (self.resolution * (x+1), self.resolution * (y + 1)),
                               _color,
                               -1)
-                text = "YES" if prediction[_index] > 0.5 + self.threshold else "NO"
+                text = "YES" if yes else "NO" if no else "?"
                 cv2.putText(_output, text, (self.resolution * x + 30, self.resolution * y + 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
-        alpha = 0.1
+        alpha = 0.2
         cv2.addWeighted(_overlay, alpha, _output, 1 - alpha,
                         0, _output)
         if _width > 1300:
@@ -95,11 +96,11 @@ def __test__(filenames):
 
 if __name__ == '__main__':
     __test__(['train/generated/empty/_0_5_road_x_17.png'
-            , 'train/generated/empty/_17_0_road_x_5.png'
-            , 'train/generated/road/_0_6_road_x_1.png'
-            , 'train/generated/road/_0_6_road_x_5.png'
+            #, 'train/generated/empty/_17_0_road_x_5.png'
+            #, 'train/generated/road/_0_6_road_x_1.png'
+            #, 'train/generated/road/_0_6_road_x_5.png'
             ,'img/lanes9.jpg'
-            , 'img/lanes2.jpg'
+            #, 'img/lanes2.jpg'
             ,'img/lanes8.jpg'
             ,'img/lanes6.jpg'
             ,'img/lanes1.jpg'

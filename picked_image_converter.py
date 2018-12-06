@@ -5,7 +5,7 @@ import os
 import cv2
 
 # TODO: parse command line args
-_INPUT_DIR = './road2'
+_INPUT_DIR = './road_x'
 #_INPUT_DIR = './test_datasets'
 _OUTPUT_DIR_0 = './train/generated/empty'
 _OUTPUT_DIR_1 = './train/generated/road'
