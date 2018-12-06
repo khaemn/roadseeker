@@ -9,7 +9,7 @@ _INPUT_DIR = './road2'
 #_INPUT_DIR = './test_datasets'
 _OUTPUT_DIR_0 = './train/generated/empty'
 _OUTPUT_DIR_1 = './train/generated/road'
-_CONVERT_TO_HSL = True
+_CONVERT_TO_HSL = False
 
 _ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', 'jpeg']
 _MODEL_EXTENSION = '.txt'
@@ -51,6 +51,7 @@ for i in range(0, total_files):
 
     # TODO: parse model file
     img = cv2.imread(os.path.join(root_back, images[i]))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     # try:
     #     data = np.asarray(img, dtype='uint8')
     # except SystemError:
@@ -77,6 +78,7 @@ for i in range(0, total_files):
                 output_path = _OUTPUT_DIR_1
                 if state == 0:
                     output_path = _OUTPUT_DIR_0
-
-                output.save(os.path.join(output_path, "_" + str(x) + "_" + str(y) + "_" + images[i]))
+                fname = images[i]
+                fname = fname.replace(".jpg", ".png")
+                output.save(os.path.join(output_path, "_" + str(x) + "_" + str(y) + "_" + fname))
             # else do not save at all (unused)

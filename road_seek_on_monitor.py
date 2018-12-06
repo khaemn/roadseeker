@@ -2,8 +2,9 @@ from roadseeker import *
 
 from PIL import Image
 import mss as MSS
+import convroaddetector as CVD
 
-monitor = {"top": 20, "left": 64, "width": 800, "height": 600}
+monitor = {"top": 50, "left": 64, "width": 800, "height": 600}
 output = "sct-{top}x{left}_{width}x{height}.png".format(**monitor)
 
 
@@ -28,10 +29,26 @@ def process_image():
             cv2.destroyAllWindows()
             quit()
 
+def process_monitor():
+    sct = MSS.mss()
+    detector = CVD.ConvDetector(CVD._MODEL_FILENAME)
 
-processor = RoadSeeker()
+    while True:
+        sct_img = sct.grab(monitor)
 
-process_image()
+        img = Image.frombytes('RGB', (sct_img.width, sct_img.height), sct_img.rgb)
+
+        raw = np.array(img)
+
+        detector.process(raw)
+
+        if cv2.waitKey(10) == 27:
+            cv2.destroyAllWindows()
+            quit()
+
+if __name__ == "__main__":
+    processor = RoadSeeker()
+    process_monitor()
 
 
 

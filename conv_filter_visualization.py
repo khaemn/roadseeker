@@ -58,7 +58,7 @@ layer_dict = dict([(layer.name, layer) for layer in model.layers[0:]])
 
 def plotFiltersFor(layer_name):
     kept_filters = []
-    for filter_index in range(32):  # number of filters in the conv layer
+    for filter_index in range(8):  # number of filters in the conv layer
         print('Processing filter %d' % filter_index)
         start_time = time.time()
 
@@ -139,10 +139,19 @@ def plotFiltersFor(layer_name):
 
 # the name of the layer we want to visualize
 # (see model definition at keras/applications/vgg16.py)
-layer_names = ['Conv2D_1'
-               ,'Conv2D_2'
-               ,'Conv2D_3'
-               #,'Conv2D_4'
+layer_names = [#'Conv2D_1'
+               #,'Conv2D_2'
+               #,'Conv2D_3'
+               #'Conv2D_4'
+               #,'Conv2D_5'
+               #,'Conv2D_6'
+               #'Conv2D_7'
+               #,'Conv2D_8'
+               #,'Conv2D_9'
+               'Conv2D_1'
+               , 'Conv2D_10'
+               #,'Conv2D_11'
+               #,'Conv2D_12'
                ]
 
 for lname in layer_names:

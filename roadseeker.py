@@ -566,7 +566,7 @@ def process_video(input=0, mirror=False):
             quit()
 
         # First of all to increase perfomance we work with small video
-        raw = imutils.resize(original, _VIDEO_WIDTH)
+        #raw = imutils.resize(original, _VIDEO_WIDTH)
 
 
         # hsl = processor.toHls(raw)
@@ -595,15 +595,15 @@ def process_video(input=0, mirror=False):
         #
         # # cv2.imshow('Lane', processor.driving_lane(raw))
 
-        hls = processor.toHls(raw)
+        #hls = processor.toHls(raw)
 
         # asphalt = processor.calcAsphaltColorsHistHLS(hls)
 
-        thresholdedOr = processor.thresholdedBy3Hist(hls)
+        #thresholdedOr = processor.thresholdedBy3Hist(hls)
 
-        cutted = processor.plotInfo(raw)
-        processor.plotRoiBorder(cutted)
-        cv2.imshow('Processed HSL', np.concatenate((cutted, thresholdedOr), axis=1))
+        #cutted = processor.plotInfo(raw)
+        #processor.plotRoiBorder(cutted)
+        #cv2.imshow('Processed HSL', np.concatenate((cutted, thresholdedOr), axis=1))
 
         #asphalt = processor.calcAsphaltColorsKmean(raw)
 
@@ -612,13 +612,17 @@ def process_video(input=0, mirror=False):
         #cutted = processor.plotInfo(raw)
         #cv2.imshow('Processed RGB', np.concatenate((cutted, thresholdedOr), axis=1))
 
-        cv2.imshow('Lane', cv2.blur(thresholdedOr, (5,5)))
+        #cv2.imshow('Lane', cv2.blur(thresholdedOr, (5,5)))
 
-        cv2.imshow('Detector', detector.process(original))
+        dataForNN = cv2.cvtColor(original, cv2.COLOR_BGR2RGB)
+        nn_processed = detector.process(dataForNN)
+        #cv2.imshow('Detector', nn_processed)
 
         if cv2.waitKey(1) == 27:
             break  # esc to quit
     cv2.destroyAllWindows()
 
-process_video('video/road3.mp4')
-# process_video()
+if __name__ == "__main__":
+
+    process_video('video/road6.mp4')
+    # process_video()
