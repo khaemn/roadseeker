@@ -30,12 +30,14 @@ class ConvDetector:
     def split_input(self, _img, x_offset=0, y_offset=0):
         (_height, _width, _) = _img.shape
         inputs = []
-        max_x = math.floor((_width - x_offset) / self.resolution)
-        max_y = math.floor((_height - x_offset) / self.resolution)
+        max_x = round((_width  # - x_offset
+                       ) / self.resolution)
+        max_y = round((_height  # - x_offset
+                       ) / self.resolution)
         x_limit = 0 if x_offset <= 0 else 1
         y_limit = 0 if y_offset <= 0 else 1
-        max_x -= x_limit
-        max_y -= y_limit
+        #max_x -= x_limit
+        #max_y -= y_limit
         if _height == self.resolution and _width == self.resolution:
             inputs.append(_img)
         else:
@@ -43,6 +45,13 @@ class ConvDetector:
                 for y in range(0, max_y):
                     cropped = _img[self.resolution * y + y_offset:self.resolution * (y + 1) + y_offset,
                                   self.resolution * x + x_offset:self.resolution * (x + 1) + x_offset]
+                    c_height, c_width, _ = cropped.shape
+                    # If the cropped part is smaller than necessary, extend it with zeroes
+                    if c_height < self.resolution or c_width < self.resolution:
+                        corrected = np.zeros((self.resolution, self.resolution, 3))
+                        corrected[:c_height, :c_width] = cropped
+                        cropped = corrected
+
                     # print("\nX:%d, Y:%d, x_offset:%d, y_offset:%d, max_xL:%d, max_yL:%d"
                           # % (x, y, x_offset, y_offset, max_x - x_limit, max_y - y_limit), cropped.shape)
                     inputs.append(cropped)
@@ -61,6 +70,7 @@ class ConvDetector:
 
         max_x, max_y, inputs = self.split_input(_img, _offset)
         prediction = self.predict(inputs)
+        print("Splitting from Processor:", max_x, max_y, len(prediction))
         #print(prediction)  # Print some predictions for debug
         # assert len(prediction) == max_x * max_y
         _overlay = _img.copy()
@@ -96,8 +106,8 @@ class ConvDetector:
 
         heat_stride = int(self.resolution / overlapping_ratio)
 
-        h_width = int(_width / self.resolution) * overlapping_ratio
-        h_height = int(_height / self.resolution) * overlapping_ratio
+        h_width = round(_width / self.resolution) * overlapping_ratio
+        h_height = round(_height / self.resolution) * overlapping_ratio
         heatmap = np.zeros((h_height, h_width))
         _overlay = _img.copy()
 
@@ -108,11 +118,12 @@ class ConvDetector:
                 y_offset = y * heat_stride
                 max_x, max_y, inputs = self.split_input(_img, x_offset, y_offset)
                 prediction = self.predict(inputs)
-                print(prediction)
+                print("Splitting from Overlapper:", max_x, max_y, len(prediction))
+                # print(prediction)
                 # Reshaping prediction to restore 2-d matrix
                 prediction = prediction.reshape((max_x, max_y))
                 prediction = prediction.transpose()
-                print(prediction)
+                # print(prediction)
 
                 # Adding the predicted map to main heatmap. Each cell on the prediction should cover
                 # *overlapping_ratio cells in the main heatmap.
@@ -120,16 +131,24 @@ class ConvDetector:
                     for h_y in range(0, max_y):
                         cell_value = prediction[h_y, h_x]
                         # a[2:4] += 5 https://stackoverflow.com/questions/32542689
-                        heatmap[h_y * overlapping_ratio + y : h_y * overlapping_ratio + overlapping_ratio + y,
-                                h_x * overlapping_ratio + x : h_x * overlapping_ratio + overlapping_ratio + x
-                                ] += cell_value
+                        center_y = h_y * overlapping_ratio + y
+                        center_x = h_x * overlapping_ratio + x
+                        cell_size_offset = overlapping_ratio
+                        top_left_y = center_y  #  - _offset
+                        top_left_x = center_x  # - _offset
+                        bottom_right_y = min(h_height, top_left_y + cell_size_offset) + 1  # +1 because of NP range specific
+                        bottom_right_x = min(h_width, top_left_x + cell_size_offset) + 1  # +1 because of NP range specific
 
-                pass
+                        print("HX:%d, HY:%d, tlx:%d, tly:%d, cx:%d, cy:%d, brx:%d, bry:%d, added val:%1.1f"
+                              % (h_x, h_y, top_left_x, top_left_y, center_x, center_y, bottom_right_x, bottom_right_y, cell_value))
+                        heatmap[top_left_y : bottom_right_y,
+                                top_left_x : bottom_right_x
+                                ] += cell_value
 
         # Visualizing the heatmap
         for x in range(0, h_width):
             for y in range(0, h_height):
-                _heat_threshold = (overlapping_ratio) ** 2 - (overlapping_ratio - 1)
+                _heat_threshold = (overlapping_ratio) ** 2 - (overlapping_ratio * 0.5)
                 is_road = heatmap[y, x] > _heat_threshold
                 _color = self.true_color if is_road else self.false_color
                 cv2.rectangle(_overlay,
@@ -137,12 +156,12 @@ class ConvDetector:
                               (heat_stride * (x + 1), heat_stride * (y + 1)),
                               _color,
                               -1)
-                text = "%0d" % heatmap[y, x]
+                text = "%2.1f" % heatmap[y, x]
+                font_height = 1 / overlapping_ratio
                 cv2.putText(_img, text, (heat_stride * x + 10, heat_stride * y + 20),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (self.max_RGB, self.max_RGB, self.max_RGB), 1, cv2.LINE_AA)
+                            cv2.FONT_HERSHEY_SIMPLEX, font_height, (self.max_RGB, self.max_RGB, self.max_RGB), 1, cv2.LINE_AA)
 
-        print('Heatmap:', heatmap)
-        # assert len(prediction) == max_x * max_y
+        # print('Heatmap:', heatmap)
 
         if _CONVERT_TO_HSL:
             _img = cv2.cvtColor(_img, cv2.COLOR_HLS2RGB)
@@ -154,7 +173,7 @@ class ConvDetector:
         if _width > 1300:
             _img = cv2.resize(_img, (int(_width / 2), int(_height / 2)))
         cv2.imshow('Heatmap', _img)
-        return _img
+        return heatmap
 
 def __test__(filenames):
     for filename in filenames:
@@ -168,7 +187,7 @@ def __test__(filenames):
         else:
             data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
 
-        detector.process(data, _offset=0)
+        #detector.process(data, _offset=0)
         detector.heatmap(data, 4)
 
         cv2.waitKey(0)
@@ -180,11 +199,11 @@ if __name__ == '__main__':
             #, 'train/generated/empty/_17_0_road_x_5.png'
             #, 'train/generated/road/_0_6_road_x_1.png'
             #, 'train/generated/road/_0_6_road_x_5.png'
-            # , 'img/lanes1.jpg'
-            #, 'img/lanes1_r.jpg'
-            #'img/lanes9.jpg'
-            #'img/lanes2.jpg'
-            'img/lanes8.jpg'
+            # 'img/lanes1.jpg'
+             'img/lanes1_r.jpg'
+            , 'img/lanes9.jpg'
+            , 'img/lanes2.jpg'
+            , 'img/lanes8.jpg'
             #, 'img/lanes6.jpg'
             ])
 
