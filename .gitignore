@@ -1,7 +1,9 @@
 road2/
-img/
+*-src*
 marked_sky/
 __pycache__/
+filters/
+horus-train/
 video/
 .idea/
 data_road_selected/

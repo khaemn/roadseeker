@@ -192,14 +192,14 @@ def __test__(filenames):
             data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
 
         #detector.process(data, _offset=0)
-        oversampling = 10
+        oversampling = 6
         interpolation = cv2.INTER_LANCZOS4
         #interpolation = cv2.INTER_CUBIC
-        heatmap = detector.heatmap(data, oversampling_ratio=oversampling, threshold=0.7)
+        heatmap = detector.heatmap(data, oversampling_ratio=oversampling, threshold=0.8)
         heatmap = heatmap / np.amax(heatmap) * 255
         heatmap = cv2.resize(heatmap, (int(width/2), int(height/2)), interpolation=interpolation)
         cv2.imshow("Raw map", heatmap / 100)
-        _, threshed = cv2.threshold(heatmap, 170, 255, cv2.THRESH_BINARY)
+        _, threshed = cv2.threshold(heatmap, 200, 255, cv2.THRESH_BINARY)
         cv2.imshow("Thresholded", threshed)
 
         cv2.waitKey(0)
