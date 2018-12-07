@@ -5,7 +5,7 @@ import os
 import cv2
 
 # TODO: parse command line args
-_INPUT_DIR = './road_x'
+_INPUT_DIR = './road3-src'
 #_INPUT_DIR = './test_datasets'
 _OUTPUT_DIR_0 = './train/generated/empty'
 _OUTPUT_DIR_1 = './train/generated/road'
@@ -20,7 +20,8 @@ models = []
 for root_back, dirs_back, files_back in os.walk(_INPUT_DIR):
     for _file in files_back:
         # TODO: use list of extensions here
-        if _file.endswith(_ALLOWED_IMAGE_EXTENSIONS[1]):
+        if _file.endswith(_ALLOWED_IMAGE_EXTENSIONS[1])\
+                or _file.endswith(_ALLOWED_IMAGE_EXTENSIONS[0]):
             images.append(_file)
         if(_file.endswith(_MODEL_EXTENSION)):
             models.append(_file)

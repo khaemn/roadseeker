@@ -101,23 +101,25 @@ class ConvDetector:
         cv2.imshow('Processed', _img)
         return _img
 
-    def heatmap(self, _img, overlapping_ratio=2):
+    def heatmap(self, _img, oversampling_ratio=2, threshold=0.8):
         (_height, _width, _) = _img.shape
 
-        heat_stride = int(self.resolution / overlapping_ratio)
+        heat_stride = int(self.resolution / oversampling_ratio)
 
-        h_width = round(_width / self.resolution) * overlapping_ratio
-        h_height = round(_height / self.resolution) * overlapping_ratio
+        h_width = round(_width / self.resolution) * oversampling_ratio
+        h_height = round(_height / self.resolution) * oversampling_ratio
         heatmap = np.zeros((h_height, h_width))
         _overlay = _img.copy()
 
+        neuron_evaluations = 0
         # Filling the heatmap
-        for x in range(0, overlapping_ratio):
-            for y in range(0, overlapping_ratio):
+        for x in range(0, oversampling_ratio):
+            for y in range(0, oversampling_ratio):
                 x_offset = x * heat_stride
                 y_offset = y * heat_stride
                 max_x, max_y, inputs = self.split_input(_img, x_offset, y_offset)
                 prediction = self.predict(inputs)
+                neuron_evaluations += len(inputs)
                 print("Splitting from Overlapper:", max_x, max_y, len(prediction))
                 # print(prediction)
                 # Reshaping prediction to restore 2-d matrix
@@ -131,24 +133,26 @@ class ConvDetector:
                     for h_y in range(0, max_y):
                         cell_value = prediction[h_y, h_x]
                         # a[2:4] += 5 https://stackoverflow.com/questions/32542689
-                        center_y = h_y * overlapping_ratio + y
-                        center_x = h_x * overlapping_ratio + x
-                        cell_size_offset = overlapping_ratio
+                        center_y = h_y * oversampling_ratio + y
+                        center_x = h_x * oversampling_ratio + x
+                        cell_size_offset = oversampling_ratio
                         top_left_y = center_y  #  - _offset
                         top_left_x = center_x  # - _offset
                         bottom_right_y = min(h_height, top_left_y + cell_size_offset) + 1  # +1 because of NP range specific
                         bottom_right_x = min(h_width, top_left_x + cell_size_offset) + 1  # +1 because of NP range specific
 
-                        print("HX:%d, HY:%d, tlx:%d, tly:%d, cx:%d, cy:%d, brx:%d, bry:%d, added val:%1.1f"
-                              % (h_x, h_y, top_left_x, top_left_y, center_x, center_y, bottom_right_x, bottom_right_y, cell_value))
+                        #print("HX:%d, HY:%d, tlx:%d, tly:%d, cx:%d, cy:%d, brx:%d, bry:%d, added val:%1.1f"
+                              #% (h_x, h_y, top_left_x, top_left_y, center_x, center_y,
+                                 #bottom_right_x, bottom_right_y, cell_value))
                         heatmap[top_left_y : bottom_right_y,
                                 top_left_x : bottom_right_x
                                 ] += cell_value
-
+                # impl rebound here
+        print("Neuron network evaluations:", neuron_evaluations)
         # Visualizing the heatmap
         for x in range(0, h_width):
             for y in range(0, h_height):
-                _heat_threshold = (overlapping_ratio) ** 2 - (overlapping_ratio * 0.5)
+                _heat_threshold = (oversampling_ratio) ** 2 * threshold
                 is_road = heatmap[y, x] > _heat_threshold
                 _color = self.true_color if is_road else self.false_color
                 cv2.rectangle(_overlay,
@@ -157,7 +161,7 @@ class ConvDetector:
                               _color,
                               -1)
                 text = "%2.1f" % heatmap[y, x]
-                font_height = 1 / overlapping_ratio
+                font_height = 1 / oversampling_ratio
                 cv2.putText(_img, text, (heat_stride * x + 10, heat_stride * y + 20),
                             cv2.FONT_HERSHEY_SIMPLEX, font_height, (self.max_RGB, self.max_RGB, self.max_RGB), 1, cv2.LINE_AA)
 
@@ -188,7 +192,15 @@ def __test__(filenames):
             data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
 
         #detector.process(data, _offset=0)
-        detector.heatmap(data, 4)
+        oversampling = 10
+        interpolation = cv2.INTER_LANCZOS4
+        #interpolation = cv2.INTER_CUBIC
+        heatmap = detector.heatmap(data, oversampling_ratio=oversampling, threshold=0.7)
+        heatmap = heatmap / np.amax(heatmap) * 255
+        heatmap = cv2.resize(heatmap, (int(width/2), int(height/2)), interpolation=interpolation)
+        cv2.imshow("Raw map", heatmap / 100)
+        _, threshed = cv2.threshold(heatmap, 170, 255, cv2.THRESH_BINARY)
+        cv2.imshow("Thresholded", threshed)
 
         cv2.waitKey(0)
     cv2.destroyAllWindows()
@@ -200,10 +212,14 @@ if __name__ == '__main__':
             #, 'train/generated/road/_0_6_road_x_1.png'
             #, 'train/generated/road/_0_6_road_x_5.png'
             # 'img/lanes1.jpg'
-             'img/lanes1_r.jpg'
-            , 'img/lanes9.jpg'
-            , 'img/lanes2.jpg'
+            # 'img/lanes1_r.jpg'
+            #'img/lanes9.jpg'
+             'img/lanes10.jpg'
+            #, 'img/lanes2.jpg'
             , 'img/lanes8.jpg'
+            , 'img/lanes5.png'
+            , 'img/lanes4.png'
+            , 'img/lanes3.png'
             #, 'img/lanes6.jpg'
             ])
 
