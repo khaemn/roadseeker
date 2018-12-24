@@ -1,7 +1,10 @@
 from keras.models import Sequential, load_model
+from PIL import Image
 import cv2
 import math
 import numpy as np
+import os
+
 
 _MODEL_FILENAME = 'models/model_road_detector.h5'
 _CONVERT_TO_HSL = False
@@ -101,15 +104,16 @@ class ConvDetector:
         cv2.imshow('Processed', _img)
         return _img
 
-    def heatmap(self, _img, oversampling_ratio=2, threshold=0.8):
-        (_height, _width, _) = _img.shape
+    def heatmap(self, _input, oversampling_ratio=2, threshold=0.8):
+        (_height, _width, _) = _input.shape
 
         heat_stride = int(self.resolution / oversampling_ratio)
 
         h_width = round(_width / self.resolution) * oversampling_ratio
         h_height = round(_height / self.resolution) * oversampling_ratio
         heatmap = np.zeros((h_height, h_width))
-        _overlay = _img.copy()
+        _overlay = _input.copy()
+        _img = _input.copy()
 
         neuron_evaluations = 0
         # Filling the heatmap
@@ -117,10 +121,10 @@ class ConvDetector:
             for y in range(0, oversampling_ratio):
                 x_offset = x * heat_stride
                 y_offset = y * heat_stride
-                max_x, max_y, inputs = self.split_input(_img, x_offset, y_offset)
+                max_x, max_y, inputs = self.split_input(_input, x_offset, y_offset)
                 prediction = self.predict(inputs)
                 neuron_evaluations += len(inputs)
-                print("Splitting from Overlapper:", max_x, max_y, len(prediction))
+                # print("Splitting from Overlapper:", max_x, max_y, len(prediction))
                 # print(prediction)
                 # Reshaping prediction to restore 2-d matrix
                 prediction = prediction.reshape((max_x, max_y))
@@ -148,11 +152,11 @@ class ConvDetector:
                                 top_left_x : bottom_right_x
                                 ] += cell_value
                 # impl rebound here
-        print("Neuron network evaluations:", neuron_evaluations)
+        print("Heatmapping completed, neuron network evaluations:", neuron_evaluations)
         # Visualizing the heatmap
         for x in range(0, h_width):
             for y in range(0, h_height):
-                _heat_threshold = (oversampling_ratio) ** 2 * threshold
+                _heat_threshold = (oversampling_ratio ** 2) * threshold
                 is_road = heatmap[y, x] > _heat_threshold
                 _color = self.true_color if is_road else self.false_color
                 cv2.rectangle(_overlay,
@@ -165,12 +169,6 @@ class ConvDetector:
                 cv2.putText(_img, text, (heat_stride * x + 10, heat_stride * y + 20),
                             cv2.FONT_HERSHEY_SIMPLEX, font_height, (self.max_RGB, self.max_RGB, self.max_RGB), 1, cv2.LINE_AA)
 
-        # print('Heatmap:', heatmap)
-
-        if _CONVERT_TO_HSL:
-            _img = cv2.cvtColor(_img, cv2.COLOR_HLS2RGB)
-        else:
-            _img = cv2.cvtColor(_img, cv2.COLOR_RGB2BGR)
         alpha = 0.2
         cv2.addWeighted(_overlay, alpha, _img, 1 - alpha,
                         0, _img)
@@ -191,10 +189,9 @@ def __test__(filenames):
         else:
             data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
 
-        #detector.process(data, _offset=0)
         oversampling = 6
         interpolation = cv2.INTER_LANCZOS4
-        #interpolation = cv2.INTER_CUBIC
+        print("Heatmapping image", filename, "...")
         heatmap = detector.heatmap(data, oversampling_ratio=oversampling, threshold=0.8)
         heatmap = heatmap / np.amax(heatmap) * 255
         heatmap = cv2.resize(heatmap, (int(width/2), int(height/2)), interpolation=interpolation)
@@ -204,6 +201,64 @@ def __test__(filenames):
 
         cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+def make_heatmaps(input_path,
+                  output_path,
+                  combined_path=None,
+                  oversampling_ratio=6,
+                  heat_threshold=0.8,
+                  binary_threshold=150,
+                  output_resolution=None):
+    images = []
+
+    detector = ConvDetector(_MODEL_FILENAME)
+    interpolation = cv2.INTER_LANCZOS4
+
+
+    for root_back, dirs_back, files_back in os.walk(input_path):
+        for _file in files_back:
+            images.append(_file)
+
+    total_files = len(images)
+
+    for i in range(0, total_files):
+        fname = images[i]
+        img = cv2.imread(os.path.join(root_back, fname))
+        (height, width, _) = img.shape
+        _mask_resolution = output_resolution if output_resolution else (width, height)
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        print("Heatmapping image", fname, '...')
+        heatmap = detector.heatmap(img, oversampling_ratio=oversampling_ratio, threshold=heat_threshold)
+        heatmap = heatmap / np.amax(heatmap) * 255
+
+
+        heatmap = cv2.resize(heatmap, (width, height), interpolation=interpolation)
+
+        _, mask = cv2.threshold(heatmap, binary_threshold, 255, cv2.THRESH_BINARY)
+        if output_resolution:
+            heatmap = heatmap.resize(output_resolution)
+
+        # cv2.imshow("Heatmap", threshed)
+        # cv2.waitKey(0)
+        # Saving the binary heatmap masks
+        output = Image.fromarray(mask).convert('RGB')
+        output.save(os.path.join(output_path, fname))
+
+        # TODO: try OTSU thresholding here.
+
+        # Generating and saving combined images (mask + source)
+        alpha = 0.2
+        combined = np.array(output)
+        np.array(output)
+        #cv2.imshow("Mask", combined)
+        cv2.addWeighted(combined, alpha, img, 1 - alpha, 0, combined)
+        #cv2.imshow("Combined", combined)
+        #cv2.waitKey(0)
+        combined = Image.fromarray(combined).convert('RGB')
+        combined.save(os.path.join(combined_path if combined_path else output_path, "combined_" + fname))
+    # cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
