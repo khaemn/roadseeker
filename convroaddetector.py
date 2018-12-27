@@ -33,14 +33,9 @@ class ConvDetector:
     def split_input(self, _img, x_offset=0, y_offset=0):
         (_height, _width, _) = _img.shape
         inputs = []
-        max_x = round((_width  # - x_offset
-                       ) / self.resolution)
-        max_y = round((_height  # - x_offset
-                       ) / self.resolution)
-        x_limit = 0 if x_offset <= 0 else 1
-        y_limit = 0 if y_offset <= 0 else 1
-        #max_x -= x_limit
-        #max_y -= y_limit
+        max_x = round(_width / self.resolution)
+        max_y = round(_height / self.resolution)
+
         if _height == self.resolution and _width == self.resolution:
             inputs.append(_img)
         else:
@@ -73,8 +68,8 @@ class ConvDetector:
 
         max_x, max_y, inputs = self.split_input(_img, _offset)
         prediction = self.predict(inputs)
-        print("Splitting from Processor:", max_x, max_y, len(prediction))
-        #print(prediction)  # Print some predictions for debug
+        # print("Splitting from Processor:", max_x, max_y, len(prediction))
+        # print(prediction)  # Print some predictions for debug
         # assert len(prediction) == max_x * max_y
         _overlay = _img.copy()
         if _CONVERT_TO_HSL:
@@ -104,16 +99,49 @@ class ConvDetector:
         cv2.imshow('Processed', _img)
         return _img
 
-    def heatmap(self, _input, oversampling_ratio=2, threshold=0.8):
+    def heatmap(self, _input, oversampling_ratio=2, cell_threshold=0.8):
         (_height, _width, _) = _input.shape
 
         heat_stride = int(self.resolution / oversampling_ratio)
 
         h_width = round(_width / self.resolution) * oversampling_ratio
         h_height = round(_height / self.resolution) * oversampling_ratio
-        heatmap = np.zeros((h_height, h_width))
+
         _overlay = _input.copy()
         _img = _input.copy()
+
+        # expand the input image with padding (of the same size as NN input window rectangle)
+        # data type uint8 is mandatory for opencv mats.
+        _padded = np.zeros((_height + 2 * self.resolution, _width + 2 * self.resolution, 3), dtype=np.uint8)
+        print("Input shape is", _input.shape, "while padded shape is", _padded.shape)
+
+        # Now fill the padded image. The center is the input itself.
+        # The four vertexes of original input in Padded's coordiantes:
+        padding_tl_x = self.resolution
+        padding_tl_y = self.resolution
+        padding_br_x = _width + self.resolution
+        padding_br_y = _height + self.resolution
+
+        # Copying center:
+        _padded[padding_tl_y:padding_br_y, padding_tl_x:padding_br_x] = _input[:, :]
+        # Filling top and bottom padding spaces with copied from input:
+        _padded[0:padding_tl_y, padding_tl_x:padding_br_x] = _input[:self.resolution, :]
+        _padded[padding_br_y:, padding_tl_x:padding_br_x] = _input[(_height - self.resolution):, :]
+        # Filling right and left padding spaces (using previously copied Top/Bottom ones too)
+        _padded[:, 0:padding_tl_x] = _padded[:, padding_tl_x:(padding_tl_x+self.resolution)]
+        _padded[:, padding_br_x:] = _padded[:, (padding_br_x-self.resolution):padding_br_x]
+
+        # cv2.imshow('Input', _input)
+        # cv2.imshow('Padded', _padded)
+        #
+        # print("Original center pixel", _input[int(_height/2), int(_width/2)],
+        #       "Padded center pixel", _padded[int(_height/2 + self.resolution), int(_width/2 + self.resolution)])
+        #
+        # cv2.waitKey(0)
+        max_y_with_padding = round((_height + 2 * self.resolution) / self.resolution) * oversampling_ratio # h_height + oversampling_ratio
+        max_x_with_padding = round((_width + 2 * self.resolution) / self.resolution) * oversampling_ratio # h_width + oversampling_ratio
+
+        heatmap = np.zeros((max_y_with_padding+1, max_x_with_padding+1))
 
         neuron_evaluations = 0
         # Filling the heatmap
@@ -121,10 +149,10 @@ class ConvDetector:
             for y in range(0, oversampling_ratio):
                 x_offset = x * heat_stride
                 y_offset = y * heat_stride
-                max_x, max_y, inputs = self.split_input(_input, x_offset, y_offset)
+                max_x, max_y, inputs = self.split_input(_padded, x_offset, y_offset)
                 prediction = self.predict(inputs)
                 neuron_evaluations += len(inputs)
-                # print("Splitting from Overlapper:", max_x, max_y, len(prediction))
+                # print("Splitting from Overlapper:", max_y, max_x, len(prediction))
                 # print(prediction)
                 # Reshaping prediction to restore 2-d matrix
                 prediction = prediction.reshape((max_x, max_y))
@@ -135,15 +163,16 @@ class ConvDetector:
                 # *overlapping_ratio cells in the main heatmap.
                 for h_x in range(0, max_x):
                     for h_y in range(0, max_y):
-                        cell_value = prediction[h_y, h_x]
+                        # Rounding added here with threshold 0.5, but could be not the best way to sum heat:
+                        cell_value = 1 if prediction[h_y, h_x] > cell_threshold else 0
                         # a[2:4] += 5 https://stackoverflow.com/questions/32542689
                         center_y = h_y * oversampling_ratio + y
                         center_x = h_x * oversampling_ratio + x
                         cell_size_offset = oversampling_ratio
-                        top_left_y = center_y  #  - _offset
-                        top_left_x = center_x  # - _offset
-                        bottom_right_y = min(h_height, top_left_y + cell_size_offset) + 1  # +1 because of NP range specific
-                        bottom_right_x = min(h_width, top_left_x + cell_size_offset) + 1  # +1 because of NP range specific
+                        top_left_y = center_y
+                        top_left_x = center_x
+                        bottom_right_y = min(max_y_with_padding, top_left_y + cell_size_offset) + 1  # +1 because of NP range specific
+                        bottom_right_x = min(max_x_with_padding, top_left_x + cell_size_offset) + 1  # +1 because of NP range specific
 
                         #print("HX:%d, HY:%d, tlx:%d, tly:%d, cx:%d, cy:%d, brx:%d, bry:%d, added val:%1.1f"
                               #% (h_x, h_y, top_left_x, top_left_y, center_x, center_y,
@@ -153,10 +182,19 @@ class ConvDetector:
                                 ] += cell_value
                 # impl rebound here
         print("Heatmapping completed, neuron network evaluations:", neuron_evaluations)
+        # Now heatmap should be cropped in order to cut out padding of input image
+        # hm_crop_offset = int(oversampling_ratio/2)
+        hm_crop_offset = oversampling_ratio
+        (hm_height, hm_width) = heatmap.shape
+        print("Heatmap shape before cropping:", heatmap.shape)
+        print("Expected heatmap resolution:", h_height, h_width, "for input shape", _input.shape, "and overlapping ratio", oversampling_ratio)
+        heatmap = heatmap[hm_crop_offset:hm_height-hm_crop_offset, hm_crop_offset:hm_width-hm_crop_offset]
+        print("Heatmap shape after cropping:", heatmap.shape)
+
         # Visualizing the heatmap
         for x in range(0, h_width):
             for y in range(0, h_height):
-                _heat_threshold = (oversampling_ratio ** 2) * threshold
+                _heat_threshold = (oversampling_ratio ** 2) * cell_threshold
                 is_road = heatmap[y, x] > _heat_threshold
                 _color = self.true_color if is_road else self.false_color
                 cv2.rectangle(_overlay,
@@ -174,7 +212,7 @@ class ConvDetector:
                         0, _img)
         if _width > 1300:
             _img = cv2.resize(_img, (int(_width / 2), int(_height / 2)))
-        cv2.imshow('Heatmap', _img)
+        # cv2.imshow('Heatmap', _img)
         return heatmap
 
 def __test__(filenames):
@@ -192,7 +230,7 @@ def __test__(filenames):
         oversampling = 6
         interpolation = cv2.INTER_LANCZOS4
         print("Heatmapping image", filename, "...")
-        heatmap = detector.heatmap(data, oversampling_ratio=oversampling, threshold=0.8)
+        heatmap = detector.heatmap(data, oversampling_ratio=oversampling, cell_threshold=0.8)
         heatmap = heatmap / np.amax(heatmap) * 255
         heatmap = cv2.resize(heatmap, (int(width/2), int(height/2)), interpolation=interpolation)
         cv2.imshow("Raw map", heatmap / 100)
@@ -207,7 +245,7 @@ def make_heatmaps(input_path,
                   combined_path=None,
                   oversampling_ratio=6,
                   heat_threshold=0.8,
-                  binary_threshold=150,
+                  cell_threshold=0.5,
                   output_resolution=None):
     images = []
 
@@ -230,17 +268,16 @@ def make_heatmaps(input_path,
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         print("Heatmapping image", fname, '...')
-        heatmap = detector.heatmap(img, oversampling_ratio=oversampling_ratio, threshold=heat_threshold)
-        heatmap = heatmap / np.amax(heatmap) * 255
-
+        heatmap = detector.heatmap(img, oversampling_ratio=oversampling_ratio, cell_threshold=cell_threshold)
+        heatmap = heatmap / np.amax(heatmap) * ConvDetector.max_RGB
 
         heatmap = cv2.resize(heatmap, (width, height), interpolation=interpolation)
 
-        _, mask = cv2.threshold(heatmap, binary_threshold, 255, cv2.THRESH_BINARY)
+        _, mask = cv2.threshold(heatmap, ConvDetector.max_RGB * heat_threshold, ConvDetector.max_RGB, cv2.THRESH_BINARY)
         if output_resolution:
             heatmap = heatmap.resize(output_resolution)
 
-        # cv2.imshow("Heatmap", threshed)
+        # cv2.imshow("Mask", threshed)
         # cv2.waitKey(0)
         # Saving the binary heatmap masks
         output = Image.fromarray(mask).convert('RGB')
@@ -258,7 +295,7 @@ def make_heatmaps(input_path,
         #cv2.waitKey(0)
         combined = Image.fromarray(combined).convert('RGB')
         combined.save(os.path.join(combined_path if combined_path else output_path, "combined_" + fname))
-    # cv2.destroyAllWindows()
+    #cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':

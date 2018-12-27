@@ -23,8 +23,8 @@ train_data_dir = 'train/generated'
 validation_data_dir = 'train/validation'
 nb_train_samples = 5000 #00
 nb_validation_samples = 600
-epochs = 5
-batch_size = 64 # 16
+epochs = 6
+batch_size = 128 # 16
 
 # this is the augmentation configuration we will use for training
 train_datagen = ImageDataGenerator(
@@ -85,10 +85,18 @@ model_init = "he_uniform"
 
 model.add(Conv2D(8, (3, 3), kernel_initializer=model_init, input_shape=input_shape, activation='relu', name="Conv2D_1"))
 model.add(Conv2D(8, (3, 3), kernel_initializer=model_init, activation = 'relu', name="Conv2D_2"))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Dropout(0.25))
+
 model.add(Conv2D(8, (3, 3), kernel_initializer=model_init, activation = 'relu', name="Conv2D_3"))
-model.add(Conv2D(8, (3, 3), kernel_initializer=model_init, activation = 'relu', name="Conv2D_10"))
-model.add(MaxPooling2D(pool_size=(8, 8)))
-model.add(Dropout(0.5))
+model.add(Conv2D(8, (3, 3), kernel_initializer=model_init, activation = 'relu', name="Conv2D_4"))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Dropout(0.25))
+
+model.add(Conv2D(8, (3, 3), kernel_initializer=model_init, input_shape=input_shape, activation='relu', name="Conv2D_5"))
+model.add(Conv2D(8, (3, 3), kernel_initializer=model_init, activation = 'relu', name="Conv2D_6"))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Dropout(0.25))
 
 model.add(Flatten())
 
