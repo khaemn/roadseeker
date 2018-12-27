@@ -12,6 +12,6 @@ _COMBINED_DIR = 'heatmapping/combined_out'
 make_heatmaps(input_path=_SRC_DIR,
               output_path=_OUT_DIR,
               combined_path=_COMBINED_DIR,
-              oversampling_ratio=10,
+              oversampling_ratio=4,
               heat_threshold=0.6,
               cell_threshold=0.92)

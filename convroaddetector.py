@@ -191,6 +191,10 @@ class ConvDetector:
         heatmap = heatmap[hm_crop_offset:hm_height-hm_crop_offset, hm_crop_offset:hm_width-hm_crop_offset]
         print("Heatmap shape after cropping:", heatmap.shape)
 
+        visualize_hm = False
+        if not visualize_hm:
+            return heatmap
+
         # Visualizing the heatmap
         for x in range(0, h_width):
             for y in range(0, h_height):
@@ -280,22 +284,27 @@ def make_heatmaps(input_path,
         # cv2.imshow("Mask", threshed)
         # cv2.waitKey(0)
         # Saving the binary heatmap masks
-        output = Image.fromarray(mask).convert('RGB')
-        output.save(os.path.join(output_path, fname))
+        road_mask = Image.fromarray(mask).convert('RGB')
+        road_mask.save(os.path.join(output_path, fname))
 
         # TODO: try OTSU thresholding here.
 
         # Generating and saving combined images (mask + source)
         alpha = 0.2
-        combined = np.array(output)
-        np.array(output)
-        #cv2.imshow("Mask", combined)
-        cv2.addWeighted(combined, alpha, img, 1 - alpha, 0, combined)
-        #cv2.imshow("Combined", combined)
-        #cv2.waitKey(0)
+        combined = np.array(img, dtype=np.uint8)
+        color_fill = img
+        color_fill[:, :] = [255, 0, 255]
+        # mask = np.array(road_mask, dtype=np.uint8)
+        # mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        mask = mask.astype(np.uint8)
+        color_fill = cv2.bitwise_and(color_fill, color_fill, mask=mask)
+        # cv2.imshow("FillMask", color_fill)
+        cv2.addWeighted(combined, 1 - alpha, color_fill, alpha, 0, combined)
+        # cv2.imshow("Combined", combined)
+        # cv2.waitKey(0)
         combined = Image.fromarray(combined).convert('RGB')
         combined.save(os.path.join(combined_path if combined_path else output_path, "combined_" + fname))
-    #cv2.destroyAllWindows()
+    # cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
