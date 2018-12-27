@@ -275,6 +275,9 @@ def make_heatmaps(input_path,
         heatmap = detector.heatmap(img, oversampling_ratio=oversampling_ratio, cell_threshold=cell_threshold)
         heatmap = heatmap / np.amax(heatmap) * ConvDetector.max_RGB
 
+        # Fisrt threshold before resizing --- note: gives bad result
+        # _, heatmap = cv2.threshold(heatmap, ConvDetector.max_RGB * heat_threshold, ConvDetector.max_RGB, cv2.THRESH_BINARY)
+
         heatmap = cv2.resize(heatmap, (width, height), interpolation=interpolation)
 
         _, mask = cv2.threshold(heatmap, ConvDetector.max_RGB * heat_threshold, ConvDetector.max_RGB, cv2.THRESH_BINARY)
@@ -292,18 +295,16 @@ def make_heatmaps(input_path,
         # Generating and saving combined images (mask + source)
         alpha = 0.2
         combined = np.array(img, dtype=np.uint8)
-        color_fill = img
-        color_fill[:, :] = [255, 0, 255]
-        # mask = np.array(road_mask, dtype=np.uint8)
-        # mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         mask = mask.astype(np.uint8)
+        color_fill = img
+        color_fill[:, :] = [255, 50, 255]
         color_fill = cv2.bitwise_and(color_fill, color_fill, mask=mask)
-        # cv2.imshow("FillMask", color_fill)
         cv2.addWeighted(combined, 1 - alpha, color_fill, alpha, 0, combined)
-        # cv2.imshow("Combined", combined)
-        # cv2.waitKey(0)
         combined = Image.fromarray(combined).convert('RGB')
         combined.save(os.path.join(combined_path if combined_path else output_path, "combined_" + fname))
+        # cv2.imshow("FillMask", color_fill)
+        # cv2.imshow("Combined", combined)
+        # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
 
