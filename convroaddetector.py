@@ -188,7 +188,7 @@ class ConvDetector:
         (hm_height, hm_width) = heatmap.shape
         print("Heatmap shape before cropping:", heatmap.shape)
         print("Expected heatmap resolution:", h_height, h_width, "for input shape", _input.shape, "and overlapping ratio", oversampling_ratio)
-        heatmap = heatmap[hm_crop_offset:hm_height-hm_crop_offset, hm_crop_offset:hm_width-hm_crop_offset]
+        heatmap = heatmap[hm_crop_offset:hm_height-hm_crop_offset-1, hm_crop_offset:hm_width-hm_crop_offset-1]
         print("Heatmap shape after cropping:", heatmap.shape)
 
         visualize_hm = False
@@ -260,7 +260,7 @@ def make_heatmaps(input_path,
     for root_back, dirs_back, files_back in os.walk(input_path):
         for _file in files_back:
             images.append(_file)
-
+    # images.sort() - unsorted image picking gives better represantability
     total_files = len(images)
 
     for i in range(0, total_files):
@@ -270,6 +270,7 @@ def make_heatmaps(input_path,
         _mask_resolution = output_resolution if output_resolution else (width, height)
 
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        origin = img.copy()
 
         print("Heatmapping image", fname, '...')
         heatmap = detector.heatmap(img, oversampling_ratio=oversampling_ratio, cell_threshold=cell_threshold)
@@ -302,7 +303,26 @@ def make_heatmaps(input_path,
         cv2.addWeighted(combined, 1 - alpha, color_fill, alpha, 0, combined)
         combined = Image.fromarray(combined).convert('RGB')
         combined.save(os.path.join(combined_path if combined_path else output_path, "combined_" + fname))
-        # cv2.imshow("FillMask", color_fill)
+
+        # Generating training data for the road VAE
+        # TODO: remove this code from here after debugging of the VAE is completed
+        _X_TRAIN_DIR = 'heatmapping/dataset_out'
+        (gen_w, gen_h) = (160, 90)
+
+        (height, width, depth) = img.shape
+
+        x_resized = cv2.resize(origin, (gen_w, gen_h), interpolation=cv2.INTER_LINEAR)
+        y_resized = cv2.resize(mask.astype(np.uint8), (gen_w, gen_h), interpolation=cv2.INTER_LINEAR)
+        y_resized = cv2.cvtColor(y_resized, cv2.COLOR_GRAY2RGB)
+
+        data_output = np.zeros((gen_h, gen_w * 2, depth), dtype='uint8')
+        data_output[:, :gen_w] = x_resized
+        data_output[:, gen_w:] = y_resized
+
+        data_output = Image.fromarray(data_output)
+        data_output_path = os.path.join(_X_TRAIN_DIR, fname)
+        data_output.save(data_output_path)
+
         # cv2.imshow("Combined", combined)
         # cv2.waitKey(0)
     # cv2.destroyAllWindows()

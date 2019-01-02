@@ -7,7 +7,6 @@ from keras.layers import Activation, Dropout, Flatten, Dense
 from keras import backend as K
 import matplotlib.pyplot as plt
 import random
-#import convroaddetector as CVD
 
 random.seed(777)
 
@@ -21,10 +20,10 @@ img_width, img_height = 100, 100
 
 train_data_dir = 'train/generated'
 validation_data_dir = 'train/validation'
-nb_train_samples = 5000 #00
-nb_validation_samples = 600
-epochs = 6
-batch_size = 128 # 16
+nb_train_samples = 20000 #00
+nb_validation_samples = 2000
+epochs = 5
+batch_size = 64 # 16
 
 # this is the augmentation configuration we will use for training
 train_datagen = ImageDataGenerator(
@@ -32,7 +31,6 @@ train_datagen = ImageDataGenerator(
     , shear_range=0.051
     , zoom_range=0.051
     , horizontal_flip=True
-    #horizontal_flip=False
 )
 
 # this is the augmentation configuration we will use for testing:
