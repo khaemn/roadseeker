@@ -35,9 +35,9 @@ _COMBINED_DIR = 'heatmapping/combined_out'
 make_heatmaps(input_path=_SRC_DIR,
               output_path=_OUT_DIR,
               combined_path=_COMBINED_DIR,
-              oversampling_ratio=2, #8,
-              heat_threshold=0.37,
-              cell_threshold=0.61)
+              oversampling_ratio=8,
+              heat_threshold=0.35,
+              cell_threshold=0.63)
 
 # --- retrained again on expanded dataset to remove air artiacts
 # OR04 HT.45 CT.70 - checkup - good edge sticking, better horizon, NO AIR ARTIFACTS!
@@ -64,5 +64,5 @@ make_heatmaps(input_path=_SRC_DIR,
                     #  mirrored images (!)
 # OR20 HT.41 CT.65 - ABIITLOWER - not bad, very slow - waiting for all pics...
         # Very slow but does not worth the efforts...
-
-# OR08 HT.37 CT.61 -
+# OR08 HT.37 CT.61 - nomal results
+# OR08 HT.35 CT.63 - used for VAE dataset generation
